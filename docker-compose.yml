@@ -28,11 +28,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - mongo
-    entrypoint: ["/wait-for-it.sh", "mongo", "27017", "--", "node", "server.js"]
-    volumes:
-      - ./wait-for-it.sh:/wait-for-it.sh:ro
-
+      mongo:
+        condition: service_healthy
 
   frontend:
     image: vasanthmano/mean-frontend:latest
