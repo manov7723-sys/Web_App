@@ -1,19 +1,20 @@
-# Step 1: Build Angular app
-FROM node:18 AS build
+# Step 1 i need base image
+FROM node:18
 
+# Step 2 Set working directory inside container
 WORKDIR /usr/src/app
 
+# Step 3 Copy package.json and package-lock.json
 COPY package*.json ./
+
+# Step 4 Install dependencies
 RUN npm install
 
+# Step 5 Copy backend source code
 COPY . .
-RUN npm run build --prod
 
-# Step 2: Serve using Nginx
-FROM nginx:alpine
+# Step 6 Expose backend port
+EXPOSE 3000
 
-COPY --from=build /usr/src/app/dist/angular-15-crud  /usr/share/nginx/html
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Step 7 Command to start the backend server
+CMD ["node", "server.js"]
