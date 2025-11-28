@@ -12,9 +12,14 @@ services:
       - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
-    image: vasanthmano/mean-backend:latest   
+    image: vasanthmano/mean-backend:latest
     container_name: backend
     restart: always
     environment:
@@ -23,16 +28,23 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   frontend:
-    image: vasanthmano/mean-frontend:latest  
+    image: vasanthmano/mean-frontend:latest
     container_name: frontend
     restart: always
     ports:
-      - "4200:80"
+      - "4200:80"   
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   nginx:
     image: nginx:alpine
