@@ -14,9 +14,7 @@ services:
       - mongo-data:/data/db
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: vasanthmano/mean-backend:latest   
     container_name: backend
     restart: always
     environment:
@@ -28,9 +26,7 @@ services:
       - mongo
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: vasanthmano/mean-frontend:latest  
     container_name: frontend
     restart: always
     ports:
