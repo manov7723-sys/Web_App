@@ -2,22 +2,21 @@ pipeline {
     agent any
     
     environment {
-        DOCKERHUB_USER = credentials('vasanthmano') 
-        DOCKERHUB_PASS = credentials('Moto@1234')  
+        DOCKERHUB_CREDS = credentials('dockerhub-creds')  
     }
     
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/manov7723-sys/Web_App.git', credentialsId: 'github-ssh'  
+                git branch: 'main', url: 'https://github.com/manov7723-sys/Web_App.git', credentialsId: 'github-creds'
             }
         }
         
         stage('Build Docker Images') {
             steps {
                 script {
-                    sh "docker build -t vasanthmano/mean-backend:latest ./backend"
-                    sh "docker build -t vasanthmano/mean-frontend:latest ./frontend"
+                    sh "docker build -t \$DOCKERHUB_CREDS_USR/mean-backend:latest ./backend"
+                    sh "docker build -t \$DOCKERHUB_CREDS_USR/mean-frontend:latest ./frontend"
                 }
             }
         }
@@ -25,9 +24,9 @@ pipeline {
         stage('Push Images to Docker Hub') {
             steps {
                 script {
-                    sh "echo \$Moto@1234 | docker login -u \$vasanthmano --password-stdin"
-                    sh "docker push vasanthmano/mean-backend:latest"
-                    sh "docker push vasanthmano/mean-frontend:latest"
+                    sh "echo \$DOCKERHUB_CREDS_PSW | docker login -u \$DOCKERHUB_CREDS_USR --password-stdin"
+                    sh "docker push \$DOCKERHUB_CREDS_USR/mean-backend:latest"
+                    sh "docker push \$DOCKERHUB_CREDS_USR/mean-frontend:latest"
                 }
             }
         }
@@ -36,7 +35,8 @@ pipeline {
             steps {
                 script {
                     sh """
-                        cd ~/mean-app || mkdir -p ~/mean-app
+                        mkdir -p ~/mean-app
+                        cd ~/mean-app
                         docker-compose pull
                         docker-compose up -d --remove-orphans
                     """
