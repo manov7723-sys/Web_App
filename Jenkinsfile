@@ -9,7 +9,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'git@github.com:manov7723-sys/Web_App.git', credentialsId: 'github-ssh'  
+                git branch: 'main', url: 'https://github.com/manov7723-sys/Web_App.git', credentialsId: 'github-ssh'  
             }
         }
         
