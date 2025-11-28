@@ -28,23 +28,20 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      mongo:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - mongo
+    entrypoint: ["/wait-for-it.sh", "mongo", "27017", "--", "node", "server.js"]
+    volumes:
+      - ./wait-for-it.sh:/wait-for-it.sh:ro
+
 
   frontend:
     image: vasanthmano/mean-frontend:latest
     container_name: frontend
     restart: always
     ports:
-      - "4200:80"   
+      - "4200:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
 
   nginx:
     image: nginx:alpine
