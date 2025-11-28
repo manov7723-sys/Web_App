@@ -35,10 +35,14 @@ pipeline {
             steps {
                 script {
                     sh """
-                        mkdir -p ~/mean-app
-                        cd ~/mean-app
+                        cd ${WORKSPACE}  
                         docker-compose pull
                         docker-compose up -d --remove-orphans
+            """
+        }
+    }
+}
+
                     """
                 }
             }
