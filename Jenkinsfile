@@ -35,14 +35,9 @@ pipeline {
             steps {
                 script {
                     sh """
-                        cd ${WORKSPACE}  
+                        cd ${WORKSPACE}
                         docker-compose pull
                         docker-compose up -d --remove-orphans
-            """
-        }
-    }
-}
-
                     """
                 }
             }
