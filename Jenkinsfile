@@ -60,29 +60,14 @@ pipeline {
                     echo "Deploying to production..."
                     sh """
                         cd ${WORKSPACE}
-                        
-                        # Graceful cleanup
                         docker-compose down -t 30 || true
-                        
-                        # Pull YOUR latest images
                         docker-compose pull
-                        
-                        # Deploy fresh stack
                         docker-compose up -d --remove-orphans --force-recreate
-                        
-                        # Progressive health checks
-                        echo "Waiting for services..."
                         sleep 30
-                        
                         docker-compose ps
-                        
-                        # Verify frontend
                         curl -f http://localhost:80 || exit 1
-                        echo "Frontend healthy!"
-                        
-                        # Verify API
                         curl -f http://localhost:80/api || exit 1
-                        echo "Backend API healthy!"
+                        echo "All services healthy!"
                     """
                 }
             }
@@ -92,31 +77,15 @@ pipeline {
     post {
         success {
             echo "MEAN Stack Deployed Successfully!"
-            script {
-                // Jenkins workspace cleanup ONLY
-                sh """
-                    docker image prune -f || true
-                    cleanWs()
-                """
-            }
+            sh "docker image prune -f || true"
         }
         failure {
             echo "Deployment Failed!"
-            script {
-                sh """
-                    docker-compose logs nginx || true
-                    docker-compose logs backend || true
-                """
-            }
+            sh "docker-compose logs nginx || true"
+            sh "docker-compose logs backend || true"
         }
         always {
-            script {
-                // SAFE Jenkins cleanup (NOT production)
-                sh """
-                    docker image prune -f || true
-                    docker rmi \$(docker images -q -f dangling=true) -f || true
-                """
-            }
+            sh "docker image prune -f || true"
         }
     }
 }
