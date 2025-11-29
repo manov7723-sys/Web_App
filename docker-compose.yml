@@ -1,56 +1,84 @@
-version: '3.8'
-
 services:
   mongo:
-    image: mongo:6.0
+    image: mongo:7.0
     container_name: mongo
-    restart: always
+    restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: mydatabase
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - mongo_data:/data/db
+    networks:
+      - mean-network
     healthcheck:
-      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD-SHELL", "mongosh --eval 'db.runCommand({ ping: 1 })' --username admin --password password --authenticationDatabase admin"]
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 5
+      start_period: 40s
 
   backend:
     image: vasanthmano/mean-backend:latest
     container_name: backend
-    restart: always
+    restart: unless-stopped
     environment:
       MONGO_URL: mongodb://admin:password@mongo:27017/mydatabase?authSource=admin
       PORT: 3000
+      NODE_ENV: production
     ports:
       - "3000:3000"
+    volumes:
+      - backend_logs:/app/logs
     depends_on:
       mongo:
         condition: service_healthy
+    networks:
+      - mean-network
+    healthcheck:
+      disable: true
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
 
   frontend:
     image: vasanthmano/mean-frontend:latest
     container_name: frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "4200:80"
+    networks:
+      - mean-network
     depends_on:
       - backend
 
-  nginx:
+ nginx:
     image: nginx:alpine
     container_name: nginx
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - mean-network
     depends_on:
       - frontend
       - backend
 
 volumes:
-  mongo-data:
+  mongo_data:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  mean-network:
+    driver: bridge
+    name: mean-network
