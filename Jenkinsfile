@@ -19,7 +19,6 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 script {
-                    echo "Building Docker images..."
                     sh """
                         docker build -t ${DOCKERHUB_USER}/mean-backend:latest ./backend
                         docker build -t ${DOCKERHUB_USER}/mean-frontend:latest ./frontend
@@ -32,10 +31,9 @@ pipeline {
         stage('Test Images') {
             steps {
                 script {
-                    echo "Testing Docker images..."
                     sh """
-                        docker run --rm ${DOCKERHUB_USER}/mean-backend:latest echo "Backend OK" || exit 1
-                        docker run --rm ${DOCKERHUB_USER}/mean-frontend:latest echo "Frontend OK" || exit 1
+                        docker run --rm ${DOCKERHUB_USER}/mean-backend:latest echo "Backend OK"
+                        docker run --rm ${DOCKERHUB_USER}/mean-frontend:latest echo "Frontend OK"
                     """
                 }
             }
@@ -44,7 +42,6 @@ pipeline {
         stage('Push Images to Docker Hub') {
             steps {
                 script {
-                    echo "Pushing to Docker Hub..."
                     sh """
                         echo \$DOCKERHUB_CREDS_PSW | docker login -u \$DOCKERHUB_CREDS_USR --password-stdin
                         docker push ${DOCKERHUB_USER}/mean-backend:latest
@@ -57,7 +54,6 @@ pipeline {
         stage('Deploy on VM') {
             steps {
                 script {
-                    echo "Deploying to production..."
                     sh """
                         cd ${WORKSPACE}
                         docker-compose down -t 30 || true
@@ -67,7 +63,7 @@ pipeline {
                         docker-compose ps
                         curl -f http://localhost:80 || exit 1
                         curl -f http://localhost:80/api || exit 1
-                        echo "All services healthy!"
+                        echo "Deployment successful - All services healthy!"
                     """
                 }
             }
