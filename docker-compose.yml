@@ -23,7 +23,7 @@ services:
       start_period: 40s
 
   backend:
-    image: manov7723-sys/mean-backend:latest  # ← YOUR JENKINS IMAGE
+    image: vasanthmano/mean-backend:latest  # ← YOUR JENKINS IMAGE
     container_name: mean-backend
     restart: unless-stopped
     environment:
@@ -53,7 +53,7 @@ services:
           memory: 256M
 
   frontend:
-    image: manov7723-sys/mean-frontend:latest  # ← YOUR JENKINS IMAGE
+    image: vasanthmano/mean-frontend:latest  # ← YOUR JENKINS IMAGE
     container_name: mean-frontend
     restart: unless-stopped
     ports:
