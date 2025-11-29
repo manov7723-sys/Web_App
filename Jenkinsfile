@@ -12,7 +12,7 @@ pipeline {
                 git branch: 'main',
                     url: 'https://github.com/manov7723-sys/Web_App.git',
                     credentialsId: 'github-creds'
-                echo "Code checked out successfully"
+                echo 'Code checked out successfully'
             }
         }
 
@@ -45,7 +45,7 @@ pipeline {
                         echo $DOCKERHUB_CREDS_PSW | docker login -u $DOCKERHUB_CREDS_USR --password-stdin
                         docker push ${DOCKERHUB_USER}/mean-backend:latest
                         docker push ${DOCKERHUB_USER}/mean-frontend:latest
-                        docker logout
+                        docker logout || true
                     '''
                 }
             }
@@ -62,7 +62,6 @@ pipeline {
                         
                         sleep 30
                         
-                        # Health checks
                         curl -f http://localhost:80/api || echo "Backend health check failed"
                         curl -f http://localhost:80 || echo "Frontend health check failed"
                     '''
@@ -71,4 +70,17 @@ pipeline {
         }
     }
 
-    post
+    post {
+        always {
+            sh 'docker image prune -f || true'
+        }
+        success {
+            echo 'MEAN Stack deployed successfully!'
+        }
+        failure {
+            echo 'Deployment failed!'
+            sh 'docker-compose logs backend || true'
+            sh 'docker-compose logs frontend || true'
+        }
+    }
+}
