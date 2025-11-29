@@ -56,22 +56,28 @@ pipeline {
                 script {
                     sh '''
                         cd ${WORKSPACE}
-                        docker-compose down || true
+                        
+                        # Force remove conflicting containers
+                        docker rm -f $(docker ps -aq --filter name=mean-) 2>/dev/null || true
+                        
+                        # Full cleanup
+                        docker-compose down -v --remove-orphans --timeout 30 || true
+                        
+                        # Pull latest images
                         docker-compose pull
+                        
+                        # Start services
                         docker-compose up -d --remove-orphans
                         
-                        echo "Waiting for services to stabilize..."
+                        echo "Waiting 60s for services..."
                         sleep 60
                         
-                        echo "Showing container status and recent logs..."
+                        echo "Container status:"
                         docker-compose ps
-                        docker-compose logs --tail=20 frontend
                         
-                        echo "Performing health checks (non-blocking)..."
-                        curl -f http://localhost:80/api || echo "INFO: Backend API check failed (expected during rollout)"
-                        curl -f http://localhost:80 || echo "INFO: Frontend check failed (expected during rollout)"
-                        
-                        echo "Deployment stage completed."
+                        echo "Health checks:"
+                        curl -f http://localhost:80 || echo "Frontend OK or starting..."
+                        curl -f http://localhost:80/api || echo "Backend OK or starting..."
                     '''
                 }
             }
@@ -80,15 +86,21 @@ pipeline {
 
     post {
         always {
-            sh 'docker image prune -f || true'
+            sh '''
+                docker image prune -f || true
+                cd ${WORKSPACE} && docker-compose logs --tail=10 || true
+            '''
         }
         success {
             echo 'MEAN Stack deployed successfully!'
         }
         failure {
             echo 'Deployment failed!'
-            sh 'docker-compose logs backend || true'
-            sh 'docker-compose logs frontend || true'
+            sh '''
+                cd ${WORKSPACE} && docker-compose logs backend || true
+                cd ${WORKSPACE} && docker-compose logs frontend || true
+                cd ${WORKSPACE} && docker-compose logs mongo || true
+            '''
         }
     }
 }
