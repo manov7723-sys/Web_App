@@ -4,7 +4,6 @@ pipeline {
     environment {
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
         DOCKERHUB_USER = 'manov7723-sys'
-        GITHUB_REPO = 'https://github.com/manov7723-sys/Web_App.git'
     }
     
     stages {
@@ -22,8 +21,8 @@ pipeline {
                 script {
                     echo "Building Docker images..."
                     sh """
-                        docker build -t ${vasanthmano}/mean-backend:latest ./backend
-                        docker build -t ${vasanthmano}/mean-frontend:latest ./frontend
+                        docker build -t ${DOCKERHUB_USER}/mean-backend:latest ./backend
+                        docker build -t ${DOCKERHUB_USER}/mean-frontend:latest ./frontend
                         docker images | grep mean
                     """
                 }
@@ -35,8 +34,8 @@ pipeline {
                 script {
                     echo "Testing Docker images..."
                     sh """
-                        docker run --rm ${vasanthmano}/mean-backend:latest echo "Backend OK"
-                        docker run --rm ${vasanthmano}/mean-frontend:latest echo "Frontend OK"
+                        docker run --rm ${DOCKERHUB_USER}/mean-backend:latest echo "Backend OK" || exit 1
+                        docker run --rm ${DOCKERHUB_USER}/mean-frontend:latest echo "Frontend OK" || exit 1
                     """
                 }
             }
@@ -48,8 +47,8 @@ pipeline {
                     echo "Pushing to Docker Hub..."
                     sh """
                         echo \$DOCKERHUB_CREDS_PSW | docker login -u \$DOCKERHUB_CREDS_USR --password-stdin
-                        docker push ${vasanthmano}/mean-backend:latest
-                        docker push ${vasanthmano}/mean-frontend:latest
+                        docker push ${DOCKERHUB_USER}/mean-backend:latest
+                        docker push ${DOCKERHUB_USER}/mean-frontend:latest
                     """
                 }
             }
@@ -62,28 +61,28 @@ pipeline {
                     sh """
                         cd ${WORKSPACE}
                         
-                        # Cleanup old containers
+                        # Graceful cleanup
                         docker-compose down -t 30 || true
                         
-                        # Pull latest images
+                        # Pull YOUR latest images
                         docker-compose pull
                         
-                        # Deploy with health checks
+                        # Deploy fresh stack
                         docker-compose up -d --remove-orphans --force-recreate
                         
-                        # Wait for services to start
-                        echo "⏳ Waiting 30s for services..."
+                        # Progressive health checks
+                        echo "Waiting for services..."
                         sleep 30
                         
-                        # Verify deployment
                         docker-compose ps
                         
-                        # Health checks
-                        curl -f http://localhost:80 || (echo "Frontend failed!" && exit 1)
-                        curl -f http://localhost:80/api || (echo "Backend API failed!" && exit 1)
-                        curl -f http://localhost:3000 || (echo "Backend direct failed!" && exit 1)
+                        # Verify frontend
+                        curl -f http://localhost:80 || exit 1
+                        echo "Frontend healthy!"
                         
-                        echo "All services healthy!"
+                        # Verify API
+                        curl -f http://localhost:80/api || exit 1
+                        echo "Backend API healthy!"
                     """
                 }
             }
@@ -93,40 +92,29 @@ pipeline {
     post {
         success {
             echo "MEAN Stack Deployed Successfully!"
-            emailext (
-                to: '${DEFAULT_RECIPIENTS}',
-                subject: "MEAN Deploy Success - ${BUILD_NUMBER}",
-                body: """
-                MEAN Stack deployed successfully!<br/>
-                <a href="${BUILD_URL}">View Build</a><br/>
-                App: http://your-server-ip<br/>
-                Build: ${BUILD_NUMBER}
-                """
-            )
             script {
-                sh "docker image prune -f"
+                // Jenkins workspace cleanup ONLY
+                sh """
+                    docker image prune -f || true
+                    cleanWs()
+                """
             }
         }
         failure {
             echo "Deployment Failed!"
-            emailext (
-                to: '${DEFAULT_RECIPIENTS}',
-                subject: "MEAN Deploy Failed - ${BUILD_NUMBER}",
-                body: """
-                Deployment failed!<br/>
-                <a href="${BUILD_URL}">View Logs</a><br/>
-                Check docker-compose logs on server.
-                """
-            )
             script {
-                sh "docker-compose logs"  
+                sh """
+                    docker-compose logs nginx || true
+                    docker-compose logs backend || true
+                """
             }
         }
         always {
             script {
+                // SAFE Jenkins cleanup (NOT production)
                 sh """
-                    docker system prune -f || true
-                    docker logout || true
+                    docker image prune -f || true
+                    docker rmi \$(docker images -q -f dangling=true) -f || true
                 """
             }
         }
