@@ -17,13 +17,13 @@ services:
       - mean-network
     healthcheck:
       test: ["CMD-SHELL", "mongosh --eval 'db.runCommand({ ping: 1 })' --username admin --password password --authenticationDatabase admin"]
-      interval: 10s
+      interval: 30s
       timeout: 10s
       retries: 5
       start_period: 40s
 
   backend:
-    image: vasanthmano/mean-backend:latest  # ← YOUR JENKINS IMAGE
+    image: vasanthmano/mean-backend:latest
     container_name: mean-backend
     restart: unless-stopped
     environment:
@@ -31,12 +31,9 @@ services:
       PORT: 3000
       NODE_ENV: production
     ports:
-      - "3000:3000"
+      - "3001:3000"  # Changed to avoid conflict with nginx
     volumes:
       - backend_logs:/app/logs
-    depends_on:
-      mongo:
-        condition: service_healthy
     networks:
       - mean-network
     healthcheck:
@@ -53,16 +50,13 @@ services:
           memory: 256M
 
   frontend:
-    image: vasanthmano/mean-frontend:latest  # ← YOUR JENKINS IMAGE
+    image: vasanthmano/mean-frontend:latest
     container_name: mean-frontend
     restart: unless-stopped
-    ports:
-      - "4200:80"
+    expose:
+      - "80"  # Internal only - nginx proxies
     networks:
       - mean-network
-    depends_on:
-      backend:
-        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
@@ -82,12 +76,10 @@ services:
     networks:
       - mean-network
     depends_on:
-      frontend:
-        condition: service_healthy
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
       timeout: 10s
       retries: 3
