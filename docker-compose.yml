@@ -1,7 +1,9 @@
+version: '3.8'
+
 services:
   mongo:
     image: mongo:7.0
-    container_name: mongo
+    container_name: mean-mongo
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
@@ -21,8 +23,8 @@ services:
       start_period: 40s
 
   backend:
-    image: vasanthmano/mean-backend:latest
-    container_name: backend
+    image: manov7723-sys/mean-backend:latest  # ← YOUR JENKINS IMAGE
+    container_name: mean-backend
     restart: unless-stopped
     environment:
       MONGO_URL: mongodb://admin:password@mongo:27017/mydatabase?authSource=admin
@@ -38,7 +40,11 @@ services:
     networks:
       - mean-network
     healthcheck:
-      disable: true
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
@@ -47,19 +53,26 @@ services:
           memory: 256M
 
   frontend:
-    image: vasanthmano/mean-frontend:latest
-    container_name: frontend
+    image: manov7723-sys/mean-frontend:latest  # ← YOUR JENKINS IMAGE
+    container_name: mean-frontend
     restart: unless-stopped
     ports:
       - "4200:80"
     networks:
       - mean-network
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
- nginx:
+  nginx:
     image: nginx:alpine
-    container_name: nginx
+    container_name: mean-nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -69,8 +82,16 @@ services:
     networks:
       - mean-network
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 volumes:
   mongo_data:
