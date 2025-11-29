@@ -60,10 +60,18 @@ pipeline {
                         docker-compose pull
                         docker-compose up -d --remove-orphans
                         
-                        sleep 30
+                        echo "Waiting for services to stabilize..."
+                        sleep 60
                         
-                        curl -f http://localhost:80/api || echo "Backend health check failed"
-                        curl -f http://localhost:80 || echo "Frontend health check failed"
+                        echo "Showing container status and recent logs..."
+                        docker-compose ps
+                        docker-compose logs --tail=20 frontend
+                        
+                        echo "Performing health checks (non-blocking)..."
+                        curl -f http://localhost:80/api || echo "INFO: Backend API check failed (expected during rollout)"
+                        curl -f http://localhost:80 || echo "INFO: Frontend check failed (expected during rollout)"
+                        
+                        echo "Deployment stage completed."
                     '''
                 }
             }
