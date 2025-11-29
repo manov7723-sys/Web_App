@@ -1,16 +1,17 @@
 pipeline {
     agent any
-    
+
     environment {
-        // Jenkins credential:
-        //   ID: dockerhub-creds
-        //   Username: vasanthmano
-        //   Password: Docker Hub ACCESS TOKEN
+        // Jenkins credential in Manage Credentials:
+        // ID: dockerhub-creds
+        // Username: vasanthmano
+        // Password: Docker Hub ACCESS TOKEN
         DOCKERHUB_CREDS = credentials('dockerhub-creds')
         DOCKERHUB_USER  = 'vasanthmano'
     }
-    
+
     stages {
+
         stage('Checkout Code') {
             steps {
                 git branch: 'main',
@@ -19,12 +20,13 @@ pipeline {
                 echo "Code checked out from GitHub"
             }
         }
-        
+
         stage('Build Docker Images') {
             steps {
                 script {
                     echo "Building Docker images..."
                     sh """
+                        set -e
                         docker build -t ${DOCKERHUB_USER}/mean-backend:latest ./backend
                         docker build -t ${DOCKERHUB_USER}/mean-frontend:latest ./frontend
                         docker images | grep mean || true
@@ -32,24 +34,26 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Test Images') {
             steps {
                 script {
                     echo "Testing Docker images..."
                     sh """
+                        set -e
                         docker run --rm ${DOCKERHUB_USER}/mean-backend:latest echo "Backend OK"
                         docker run --rm ${DOCKERHUB_USER}/mean-frontend:latest echo "Frontend OK"
                     """
                 }
             }
         }
-        
+
         stage('Push Images to Docker Hub') {
             steps {
                 script {
                     echo "Pushing to Docker Hub..."
                     sh """
+                        set -e
                         echo \$DOCKERHUB_CREDS_PSW | docker login -u \$DOCKERHUB_CREDS_USR --password-stdin
                         docker push ${DOCKERHUB_USER}/mean-backend:latest
                         docker push ${DOCKERHUB_USER}/mean-frontend:latest
@@ -58,12 +62,13 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Deploy on VM') {
             steps {
                 script {
                     echo "Deploying to production..."
                     sh """
+                        set -e
                         cd ${WORKSPACE}
                         docker-compose down -t 30 || true
                         docker-compose pull
@@ -85,7 +90,7 @@ pipeline {
             }
         }
     }
-    
+
     post {
         success {
             echo "MEAN Stack Deployed Successfully!"
