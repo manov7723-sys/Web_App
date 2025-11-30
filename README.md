@@ -79,15 +79,94 @@ Install Jenkins on Ubuntu
 
 Make directory and Clone the Git Repo
 
+  mkdir /var/lib/jenkins/workspace/Web_App1$ 
+
+  cd /var/lib/jenkins/workspace/Web_App1$ 
   
   git clone https://github.com/manov7723-sys/Web_App.git
 
-  
+Change to home directory and create the Docker-Compose.yml file
 
-  
-																																										   
+  cd 
+
+  sudo nano docker-compose.yml 
+
+<img width="1440" height="900" alt="Screenshot 2025-11-30 at 22 32 22" src="https://github.com/user-attachments/assets/a4a0a1d0-d14e-485d-a658-65fae255761f" />
+
+save and exit the file
+
+ctrl+O > Enter > Ctrl+X
+
+Change the cd to Web_App and create the Nginx config file 
+
+cd /var/lib/jenkins/workspace/Web_App1$
+
+sudo nano nginx/default.conf
 																					
+  <img width="537" height="382" alt="Screenshot 2025-11-30 at 20 23 57" src="https://github.com/user-attachments/assets/2e38b308-a63f-4e4b-9a35-cabd1117b5b3" />
 
-  
+
+  Using docker compose up command to run the conatiner locally 
+
+  docker compose up -d 
+
+  conform the all the container are running succefully 
+
+  <img width="1440" height="208" alt="Screenshot 2025-11-30 at 22 48 22" src="https://github.com/user-attachments/assets/08f11f20-fe77-49e0-9df5-7d4c45cfff4d" />
+
+  Now Remove all the  containers,volume and down the docker compose locally and Create the CI/CD pipiline.
+
+  # 1. Basic - Stop + Remove containers/networks
+docker compose down
+
+# 2. Remove volumes too (clears MongoDB data)
+docker compose down -v
+
+# 3. Full cleanup (containers + images + volumes)
+docker compose down -v --rmi all --remove-orphans
+
+# 4. Verify clean
+docker compose ps -a  # Empty table
+docker ps -a          # No Web_App containers
+
+Write the Jenkinsfile and push to GitHub Repo
+
+ADD the port "8080" in EC2 Security group for access Jenkins
+ADD the port "80" in EC2 security group for access Application
+Login to JENKINS
+
+   • Install plugins
+      Manage Plugins > Install Docker plugins > Insatll Docker Compose Plugins
+	  
+   • Add Docker Cred
+      Manage Jenkins > Credentials > Global > Add Credentials > Username - Pass - ID
+	  
+Create a New Build using Pipeline in JENKINS\
+
+   • Name - Web_APP1
+   • Use Pipeline Script SCM
+   • Select Git 
+   • Paste the GitHub Repo link
+   • Add the already created Docker Credential
+   • Save and Apply 
+
+   <img width="1440" height="704" alt="Screenshot 2025-11-29 at 19 06 39" src="https://github.com/user-attachments/assets/611b9d18-d734-49c3-bf47-9664e2fce5a2" />
+
+   • Build the Script 
+
+<img width="1088" height="711" alt="Screenshot 2025-11-29 at 19 08 11" src="https://github.com/user-attachments/assets/93a6a3f1-1ac5-45bb-afd9-4e7c78a1dc75" />
+
+<img width="1425" height="706" alt="Screenshot 2025-11-29 at 19 11 40" src="https://github.com/user-attachments/assets/5d03631b-d5df-473b-847f-d4852e7e0fdd" />
+
+Verify all the Containers are Running Successfully 
+
+Copy the IPV4 and use port 80 and access the Web_App
+
+
+<img width="1308" height="726" alt="Screenshot 2025-11-30 at 22 46 38" src="https://github.com/user-attachments/assets/2e69d3cb-5a09-426d-bb35-e2c3719eb843" />
+
+<img width="1353" height="769" alt="Screenshot 2025-11-30 at 22 46 48" src="https://github.com/user-attachments/assets/497616f8-7f2c-4943-86fa-dabca8ec0278" />
+
+
 
 
