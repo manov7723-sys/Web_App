@@ -11,7 +11,6 @@ pipeline {
             steps {
                 git branch: 'main',
                     url: 'https://github.com/manov7723-sys/Web_App.git',
-                    credentialsId: 'github-creds'
                 echo 'Code checked out successfully'
             }
         }
