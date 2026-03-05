@@ -19,11 +19,13 @@ jobs:
       - name: Login to GitHub Container Registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      # Build frontend image
       - name: Build Frontend Docker Image
         run: |
           docker build -t ghcr.io/${{ github.repository }}/frontend:latest frontend/
           docker push ghcr.io/${{ github.repository }}/frontend:latest
 
+      # Build backend image
       - name: Build Backend Docker Image
         run: |
           docker build -t ghcr.io/${{ github.repository }}/backend:latest backend/
