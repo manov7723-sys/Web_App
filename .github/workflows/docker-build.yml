@@ -8,6 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
+      ECR_REPOSITORY: my-app1
+
     permissions:
       id-token: write
       contents: read
@@ -27,17 +31,20 @@ jobs:
 
       - name: Create ECR Repository if not exists
         run: |
-          aws ecr describe-repositories --repository-names my-app1 || \
-          aws ecr create-repository --repository-name my-app1
+          aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
+          aws ecr create-repository --repository-name $ECR_REPOSITORY
 
       - name: Build and Push Frontend Image
         run: |
           docker build -t frontend ./frontend
-          docker tag frontend:latest 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
-          docker push 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
+          docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY:frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:frontend
 
       - name: Build and Push Backend Image
         run: |
           docker build -t backend ./backend
           docker tag backend:latest 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app:backend
           docker push 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
+          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY:backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:backend
+
