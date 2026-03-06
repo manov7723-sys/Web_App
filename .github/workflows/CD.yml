@@ -35,5 +35,5 @@ jobs:
             docker rm mongodb backend frontend || true
             docker run -d --name mongodb --network my-app-network -p 27017:27017 mongo
             docker run -d --name backend --network my-app-network -p 5000:8080 -e MONGO_URL="mongodb://mongodb:27017/mydb" 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
-            docker run -d --name frontend --network my-app-network -p 3000:80 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
+            docker run -d --name frontend --network my-app-network -p 80:3000 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
 
