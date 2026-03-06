@@ -1,0 +1,38 @@
+name: Deploy to EC2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::945219712738:role/GithubAction
+          aws-region: us-east-1
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 945219712738.dkr.ecr.us-east-1.amazonaws.com
+            docker pull 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
+            docker pull 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
+            docker network create my-app-network || true
+            docker stop mongodb backend frontend || true
+            docker rm mongodb backend frontend || true
+            docker run -d --name mongodb --network my-app-network -p 27017:27017 mongo
+            docker run -d --name backend --network my-app-network -p 5000:3000 -e MONGO_URL="mongodb://mongodb:27017/mydb" 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
+            docker run -d --name frontend --network my-app-network -p 3000:80 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
