@@ -1,5 +1,3 @@
-git remote remove origin
-=======
 name: Deploy to EC2
 
 on:
