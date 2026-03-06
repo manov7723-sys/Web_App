@@ -9,24 +9,35 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
+      id-token: write
       contents: read
-      packages: write
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::945219712738:role/GithubAction
+          aws-region: us-east-1
 
-      - name: Build and Push Frontend Docker Image
-        run: |
-          REPO=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
-          docker build -t ghcr.io/$REPO/frontend:latest frontend/
-          docker push ghcr.io/$REPO/frontend:latest
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and Push Backend Docker Image
+      - name: Create ECR Repository if not exists
         run: |
-          REPO=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
-          docker build -t ghcr.io/$REPO/backend:latest backend/
-          docker push ghcr.io/$REPO/backend:latest
+          aws ecr describe-repositories --repository-names my-app1 || \
+          aws ecr create-repository --repository-name my-app1
+
+      - name: Build and Push Frontend Image
+        run: |
+          docker build -t frontend ./frontend
+          docker tag frontend:latest 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
+          docker push 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
+
+      - name: Build and Push Backend Image
+        run: |
+          docker build -t backend ./backend
+          docker tag backend:latest 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app:backend
+          docker push 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
