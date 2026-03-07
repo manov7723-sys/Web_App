@@ -46,7 +46,7 @@ jobs:
         run: docker build -t frontend ./frontend
 
       - name: Scan Frontend Image with Trivy
-        run: trivy image frontend:latest
+        run: trivy image --severity HIGH --exit-code 1 frontend:latest
 
       - name: Tag and Push Frontend Image to ECR
         run: |
@@ -68,7 +68,7 @@ jobs:
         run: docker build -t backend ./backend
 
       - name: Scan Backend Image with Trivy
-        run: trivy image backend:latest
+        run: trivy image --severity HIGH --exit-code 1 backend:latest
 
       - name: Tag and Push Backend Image to ECR
         run: |
