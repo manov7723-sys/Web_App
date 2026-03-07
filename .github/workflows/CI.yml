@@ -1,7 +1,10 @@
-name: Build and Push Docker Images
+name: Build, Scan, and Push Docker Images
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
 
 jobs:
   build:
@@ -33,14 +36,35 @@ jobs:
           aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
           aws ecr create-repository --repository-name $ECR_REPOSITORY
 
-      - name: Build and Push Frontend Image
+      - name: Install Trivy
         run: |
-          docker build -t frontend ./frontend
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+      # Frontend
+      - name: Build Frontend Image
+        run: docker build -t frontend ./frontend
+
+      - name: Scan Frontend Image with Trivy
+        run: trivy image frontend:latest
+
+      - name: Push Frontend Image to ECR
+        run: |
           docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY:frontend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:frontend
 
-      - name: Build and Push Backend Image
+      # Backend
+      - name: Build Backend Image
+        run: docker build -t backend ./backend
+
+      - name: Scan Backend Image with Trivy
+        run: trivy image backend:latest
+
+      - name: Push Backend Image to ECR
         run: |
-          docker build -t backend ./backend
           docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY:backend
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:backend
