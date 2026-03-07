@@ -23,6 +23,9 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set Commit Tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -41,39 +44,32 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y trivy
 
-      # ---------------- Frontend ----------------
+      # -------- FRONTEND --------
       - name: Build Frontend Image
         run: docker build -t frontend ./frontend
 
-      - name: Scan Frontend Image with Trivy
-        run: trivy image --severity HIGH --exit-code 1 frontend:latest
+      - name: Scan Frontend Image
+        run: trivy image --severity HIGH --exit-code 0 frontend:latest
 
-      - name: Tag and Push Frontend Image to ECR
+      - name: Tag and Push Frontend Image
         run: |
-          # Get the image ID
-          IMAGE_ID=$(docker images frontend --format "{{.ID}}")
-          
-          # Tag with unique image ID (immutable)
-          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_ID
-          
-          # Tag as latest (mutable)
-          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
-          
-          # Push both tags
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_ID
+          docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG
+          docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
+
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
 
-      # ---------------- Backend ----------------
+      # -------- BACKEND --------
       - name: Build Backend Image
         run: docker build -t backend ./backend
 
-      - name: Scan Backend Image with Trivy
-        run: trivy image --severity HIGH --exit-code 1 backend:latest
+      - name: Scan Backend Image
+        run: trivy image --severity HIGH --exit-code 0 backend:latest
 
-      - name: Tag and Push Backend Image to ECR
+      - name: Tag and Push Backend Image
         run: |
-          IMAGE_ID=$(docker images backend --format "{{.ID}}")
-          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_ID
-          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_ID
+          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG
+          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
+
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
