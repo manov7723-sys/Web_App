@@ -12,7 +12,9 @@ jobs:
 
     env:
       ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
-      ECR_REPOSITORY: my-app1
+      ECR_REPOSITORY: frontend
+      ECR_REPOSITORY1: backend
+
 
     permissions:
       id-token: write
@@ -30,11 +32,6 @@ jobs:
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Create ECR Repository if not exists
-        run: |
-          aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
-          aws ecr create-repository --repository-name $ECR_REPOSITORY
 
       - name: Install Trivy
         run: |
@@ -66,5 +63,5 @@ jobs:
 
       - name: Push Backend Image to ECR
         run: |
-          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY:backend
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:backend
+          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY1:backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY1:backend
