@@ -49,7 +49,7 @@ jobs:
         run: docker build -t frontend ./frontend
 
       - name: Scan Frontend Image
-        run: trivy image --severity HIGH --exit-code 0 frontend:latest
+        run: trivy image --severity HIGH --exit-code 1 frontend:latest
 
       - name: Tag and Push Frontend Image
         run: |
