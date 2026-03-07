@@ -12,9 +12,8 @@ jobs:
 
     env:
       ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
-      ECR_REPOSITORY: frontend
-      ECR_REPOSITORY1: backend
-
+      ECR_REPOSITORY_FRONTEND: frontend
+      ECR_REPOSITORY_BACKEND: backend
 
     permissions:
       id-token: write
@@ -42,26 +41,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y trivy
 
-      # Frontend
+      # ---------------- Frontend ----------------
       - name: Build Frontend Image
         run: docker build -t frontend ./frontend
 
       - name: Scan Frontend Image with Trivy
         run: trivy image frontend:latest
 
-      - name: Push Frontend Image to ECR
+      - name: Tag and Push Frontend Image to ECR
         run: |
-          docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY:frontend
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:frontend
+          # Get the image ID
+          IMAGE_ID=$(docker images frontend --format "{{.ID}}")
+          
+          # Tag with unique image ID (immutable)
+          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_ID
+          
+          # Tag as latest (mutable)
+          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
+          
+          # Push both tags
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_ID
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
 
-      # Backend
+      # ---------------- Backend ----------------
       - name: Build Backend Image
         run: docker build -t backend ./backend
 
       - name: Scan Backend Image with Trivy
         run: trivy image backend:latest
 
-      - name: Push Backend Image to ECR
+      - name: Tag and Push Backend Image to ECR
         run: |
-          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY1:backend
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY1:backend
+          IMAGE_ID=$(docker images backend --format "{{.ID}}")
+          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_ID
+          docker tag $IMAGE_ID $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_ID
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
