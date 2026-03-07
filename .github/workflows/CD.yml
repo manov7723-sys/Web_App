@@ -41,4 +41,4 @@ jobs:
             docker run -d --name frontend -p 80:80 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
 
 
-ok
+
