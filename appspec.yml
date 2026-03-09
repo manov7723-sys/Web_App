@@ -2,8 +2,10 @@ version: 0.0
 os: linux
 
 files:
-  - source: backend/           
-    destination: /home/ubuntu/app
+  - source: backend/
+    destination: /home/ubuntu/backend        # Backend API
+  - source: frontend/build/                 # Frontend build (create this first!)
+    destination: /home/ubuntu/frontend      # Serve from here
   - source: scripts/
     destination: /home/ubuntu/scripts
 
@@ -15,6 +17,20 @@ permissions:
     group: ubuntu
     type:
       - file
+  - object: /home/ubuntu/backend/
+    pattern: "**"
+    mode: 755
+    owner: ubuntu
+    group: ubuntu
+    type:
+      - file
+  - object: /home/ubuntu/frontend/
+    pattern: "**"
+    mode: 644
+    owner: ubuntu
+    group: ubuntu
+    type:
+      - file
 
 hooks:
   BeforeInstall:
@@ -22,7 +38,7 @@ hooks:
       timeout: 120
       runas: root
   AfterInstall:
-    - location: scripts/install_dependencies.sh
+    - location: scripts/install_backend.sh    # Backend only
       timeout: 600
       runas: root
   ApplicationStart:

@@ -1,17 +1,19 @@
 #!/bin/bash
 set -e
 
-echo "=== Starting MERN Backend Server ==="
-
-cd /home/ubuntu/app
+echo "=== Starting Backend + Frontend ==="
 
 # Kill existing processes
 pkill -f node || true
 sleep 2
 
-# Use npm start (matches your package.json)
+# Start backend
+cd /home/ubuntu/backend
 npm start &
 
-echo "=== Server started successfully (PID: $!) ==="
-sleep 5
+echo "Backend started (PID: $!)"
+sleep 3
+
+# Backend serves frontend automatically (port 3000)
+echo "=== Full MERN stack running on port 3000 ==="
 exit 0
