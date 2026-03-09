@@ -2,25 +2,31 @@ version: 0.0
 os: linux
 
 files:
-  # Copy everything from repo root to EC2 app folder
   - source: /
     destination: /home/ubuntu/app
+  - source: scripts/
+    destination: /home/ubuntu/scripts
+
+permissions:
+  - object: /home/ubuntu/scripts/
+    pattern: "*.sh"
+    mode: 755
+    owner: ubuntu
+    group: ubuntu
+    type: file
 
 hooks:
   BeforeInstall:
-    # Optional: stop old servers if needed
     - location: scripts/stop_server.sh
       timeout: 120
-      runas: ubuntu
+      runas: root
 
   AfterInstall:
-    # Install dependencies for backend & frontend
     - location: scripts/install_dependencies.sh
-      timeout: 300
-      runas: ubuntu
+      timeout: 600
+      runas: root
 
   ApplicationStart:
-    # Start backend & frontend servers
     - location: scripts/start_server.sh
       timeout: 300
       runas: ubuntu
