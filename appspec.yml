@@ -2,10 +2,8 @@ version: 0.0
 os: linux
 
 files:
-  - source: backend/
-    destination: /home/ubuntu/backend        # Backend API
-  - source: frontend/build/                 # Frontend build (create this first!)
-    destination: /home/ubuntu/frontend      # Serve from here
+  - source: /                  # Copy ENTIRE repo root
+    destination: /home/ubuntu/app
   - source: scripts/
     destination: /home/ubuntu/scripts
 

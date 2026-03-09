@@ -1,4 +1,5 @@
 const express = require("express");
+const path = require('path');  // ← ADD THIS
 //const cors = require("cors");
 
 const app = express();
@@ -8,6 +9,14 @@ app.use(express.json());
 
 // parse requests of content-type - application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
+
+// SERVE REACT FRONTEND 👇 ADD THIS BLOCK
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname)));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+  });
+}
 
 const db = require("./app/models");
 db.mongoose
