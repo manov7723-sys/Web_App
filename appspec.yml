@@ -13,7 +13,8 @@ permissions:
     mode: 755
     owner: ubuntu
     group: ubuntu
-    type: file
+    type:
+      - file
 
 hooks:
   BeforeInstall:
