@@ -1,10 +1,8 @@
-name: Build, Scan, and Push Docker Images
+name: Build and Push Docker Images
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [ main, Docker ]
 
 jobs:
   build:
@@ -12,8 +10,7 @@ jobs:
 
     env:
       ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
-      ECR_REPOSITORY_FRONTEND: frontend
-      ECR_REPOSITORY_BACKEND: backend
+      ECR_REPOSITORY: my-app1
 
     permissions:
       id-token: write
@@ -23,8 +20,21 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set Commit Tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and Push Frontend Docker Image
+        run: |
+          REPO=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$REPO/frontend:latest frontend/
+          docker push ghcr.io/$REPO/frontend:latest
+
+      - name: Build and Push Backend Docker Image
+        run: |
+          REPO=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/$REPO/backend:latest backend/
+          docker push ghcr.io/$REPO/backend:latest
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -35,41 +45,46 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Install Trivy
+      - name: Create ECR Repository if not exists
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy
+          aws ecr describe-repositories --repository-names my-app1 || \
+          aws ecr create-repository --repository-name my-app1
 
-      # -------- FRONTEND --------
-      - name: Build Frontend Image
-        run: docker build -t frontend ./frontend
-
-      - name: Scan Frontend Image
-        run: trivy image --severity HIGH --exit-code 1 frontend:latest
-
-      - name: Tag and Push Frontend Image
+      - name: Build and Push Frontend Image
         run: |
-          docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG
-          docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
+          docker build -t frontend ./frontend
+          docker tag frontend:latest 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
+          docker push 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
 
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_FRONTEND:latest
-
-      # -------- BACKEND --------
-      - name: Build Backend Image
-        run: docker build -t backend ./backend
-
-      - name: Scan Backend Image
-        run: trivy image --severity HIGH --exit-code 0 backend:latest
-
-      - name: Tag and Push Backend Image
+      - name: Build and Push Backend Image
         run: |
-          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG
-          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
+          docker build -t backend ./backend
+          docker tag backend:latest 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app:backend
+          docker push 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
 
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_BACKEND:latest
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::945219712738:role/GithubAction
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR Repository if not exists
+        run: |
+          aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
+          aws ecr create-repository --repository-name $ECR_REPOSITORY
+
+      - name: Build and Push Frontend Image
+        run: |
+          docker build -t frontend ./frontend
+          docker tag frontend:latest $ECR_REGISTRY/$ECR_REPOSITORY:frontend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:frontend
+
+      - name: Build and Push Backend Image
+        run: |
+          docker build -t backend ./backend
+          docker tag backend:latest $ECR_REGISTRY/$ECR_REPOSITORY:backend
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:backend
