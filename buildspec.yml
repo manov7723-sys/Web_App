@@ -11,22 +11,29 @@ phases:
   pre_build:
     commands:
       - echo "Installing frontend dependencies"
-      - cd frontend && npm install && cd ..
+      - cd frontend
+      - npm install
+      - cd ..
 
   build:
     commands:
       - echo "Building Angular frontend"
-      - cd frontend && npx ng build --configuration production && cd ..
-      - cd backend && npm install && cd ..
+      - cd frontend
+      - npx ng build --configuration production
+      - cd ..
 
-  post_build:  # ← YOU'RE MISSING THIS
+      - echo "Installing backend dependencies"
+      - cd backend
+      - npm install
+      - cd ..
+
+  post_build:
     commands:
-      - echo "Creating ZIP for CodeDeploy"
-      - cd $CODEBUILD_SRC_DIR
-      - zip -r app.zip appspec.yml frontend/dist/ backend/ scripts/
-      - echo "ZIP created successfully"
+      - echo "Build completed successfully"
 
 artifacts:
   files:
-    - app.zip  # ← SINGLE ZIP FILE
-  discard-paths: yes
+    - appspec.yml
+    - frontend/**/*
+    - backend/**/*
+    - scripts/**/*
