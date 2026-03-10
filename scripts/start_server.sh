@@ -3,17 +3,22 @@ set -e
 
 echo "=== Starting Backend + Frontend ==="
 
-# Kill existing processes
+APP_DIR="/home/ubuntu/app"
+
+# Kill existing node processes
+echo "Stopping existing Node processes..."
 pkill -f node || true
 sleep 2
 
 # Start backend
-cd /home/ubuntu/backend
-npm start &
+cd $APP_DIR/backend
+
+echo "Starting backend server..."
+nohup npm start > backend.log 2>&1 &
 
 echo "Backend started (PID: $!)"
+
 sleep 3
 
-# Backend serves frontend automatically (port 3000)
-echo "=== Full MERN stack running on port 3000 ==="
+echo "=== MERN backend running ==="
 exit 0
