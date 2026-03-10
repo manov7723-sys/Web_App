@@ -5,35 +5,28 @@ phases:
     runtime-versions:
       nodejs: 18
     commands:
-      - echo "Installing Angular CLI..."
+      - echo "Installing Angular CLI"
       - npm install -g @angular/cli
 
   pre_build:
     commands:
-      - echo "Installing frontend dependencies..."
-      - cd frontend
-      - npm install
-      - cd ..
+      - echo "Installing frontend dependencies"
+      - cd frontend && npm install && cd ..
 
   build:
     commands:
-      - echo "Building Angular frontend..."
-      - cd frontend
-      - npx ng build --configuration production
-      - cd ..
+      - echo "Building Angular frontend"
+      - cd frontend && npx ng build --configuration production && cd ..
+      - cd backend && npm install && cd ..
 
-      - echo "Installing backend dependencies..."
-      - cd backend
-      - npm install
-      - cd ..
-
-  post_build:
+  post_build:  # ← YOU'RE MISSING THIS
     commands:
-      - echo "Preparing deployment artifact..."
-      - ls -R
-      - zip -r app.zip frontend/dist backend appspec.yml scripts
+      - echo "Creating ZIP for CodeDeploy"
+      - cd $CODEBUILD_SRC_DIR
+      - zip -r app.zip appspec.yml frontend/dist/ backend/ scripts/
+      - echo "ZIP created successfully"
 
 artifacts:
   files:
-    - app.zip
+    - app.zip  # ← SINGLE ZIP FILE
   discard-paths: yes
