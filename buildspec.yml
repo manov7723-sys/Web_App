@@ -5,30 +5,32 @@ phases:
     runtime-versions:
       nodejs: 18
     commands:
-      - echo "Installing Angular CLI..."
+      - echo "Installing Angular CLI"
       - npm install -g @angular/cli
-      
+
   pre_build:
     commands:
-      - echo "Installing Angular dependencies..."
+      - echo "Installing frontend dependencies"
       - cd frontend
       - npm ci
-      
+      - cd ..
+
   build:
     commands:
-      - echo "Building Angular frontend..."
-      - npx ng build --configuration production --output-path=dist/angular-app
-      - cd ..
-      - echo "Installing Node server dependencies..."
-      - cd server
+      - echo "Building Angular frontend"
+      - cd frontend
+      - npx ng build --configuration production
+      - cd ../backend
+      - echo "Installing backend dependencies"
       - npm ci
-      
+      - cd ..
+
   post_build:
     commands:
-      - echo "Packaging deployment artifact..."
-      - cd ..
-      - zip -r app.zip frontend/dist/angular-app/ server/ appspec.yml scripts/
-      - echo "Build complete"
+      - echo "Preparing artifact for pipeline"
+      - cd $CODEBUILD_SRC_DIR
+      - ls -R
+      - zip -r app.zip frontend/dist backend appspec.yml scripts
 
 artifacts:
   files:
