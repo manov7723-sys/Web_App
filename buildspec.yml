@@ -1,0 +1,33 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo "Installing Angular CLI..."
+      - npm install -g @angular/cli@latest
+      
+  pre_build:
+    commands:
+      - echo "Installing Angular dependencies..."
+      - npm ci
+      
+  build:
+    commands:
+      - echo "Building Angular frontend..."
+      - ng build --configuration production --output-path=dist/angular-app
+      - echo "Installing Node.js server dependencies..."
+      - cd server && npm ci
+      
+  post_build:
+    commands:
+      - echo "Packaging deployment artifact..."
+      - cd ..
+      - zip -r app.zip dist/angular-app/ server/ appspec.yml scripts/
+      - echo "Build complete - app.zip created"
+
+artifacts:
+  files:
+    - app.zip
+  discard-paths: yes
