@@ -14,16 +14,25 @@ if ! command -v npm >/dev/null 2>&1; then
     exit 1
 fi
 
-# Navigate to app directory
 APP_DIR="/home/ubuntu/app"
+
 if [ ! -d "$APP_DIR" ]; then
     echo "Error: $APP_DIR does not exist"
     exit 1
 fi
-cd "$APP_DIR"
 
-# Install dependencies
-echo "Installing Node.js dependencies..."
-npm install
+# Install backend dependencies
+if [ -f "$APP_DIR/backend/package.json" ]; then
+    echo "Installing backend dependencies..."
+    cd $APP_DIR/backend
+    npm install
+fi
+
+# Install frontend dependencies
+if [ -f "$APP_DIR/frontend/package.json" ]; then
+    echo "Installing frontend dependencies..."
+    cd $APP_DIR/frontend
+    npm install
+fi
 
 echo "Dependencies installed successfully."
