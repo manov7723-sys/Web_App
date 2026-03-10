@@ -2,27 +2,33 @@ version: 0.0
 os: linux
 
 files:
-  - source: /                  # Copy ENTIRE repo root
-    destination: /home/ubuntu/app
-  - source: scripts/
+  - source: frontend
+    destination: /home/ubuntu/app/frontend
+
+  - source: backend
+    destination: /home/ubuntu/app/backend
+
+  - source: scripts
     destination: /home/ubuntu/scripts
 
 permissions:
-  - object: /home/ubuntu/scripts/
+  - object: /home/ubuntu/scripts
     pattern: "*.sh"
     mode: 755
     owner: ubuntu
     group: ubuntu
     type:
       - file
-  - object: /home/ubuntu/backend/
+
+  - object: /home/ubuntu/app/backend
     pattern: "**"
     mode: 755
     owner: ubuntu
     group: ubuntu
     type:
       - file
-  - object: /home/ubuntu/frontend/
+
+  - object: /home/ubuntu/app/frontend
     pattern: "**"
     mode: 644
     owner: ubuntu
@@ -35,10 +41,12 @@ hooks:
     - location: scripts/stop_server.sh
       timeout: 120
       runas: root
+
   AfterInstall:
-    - location: scripts/install_backend.sh    # Backend only
+    - location: scripts/install_dependencies.sh
       timeout: 600
       runas: root
+
   ApplicationStart:
     - location: scripts/start_server.sh
       timeout: 300
