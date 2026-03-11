@@ -4,20 +4,20 @@ const app = express();
 
 app.use(express.json());
 
-// ✅ HEALTH CHECK (Target Group needs this)
+// HEALTH CHECK
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', uptime: process.uptime() });
 });
 
-// ✅ ROOT (your original route)
+// ROOT
 app.get('/', (req, res) => {
   res.json({ message: "Orpheus Backend LIVE on port 3000!" });
 });
 
-// ❌ DISABLE MONGO UNTIL LATER
-console.log("🚀 Starting WITHOUT MongoDB (add later)");
+console.log("🚀 Starting WITHOUT MongoDB");
 
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server LIVE: http://localhost:${PORT}/health`);
 });
