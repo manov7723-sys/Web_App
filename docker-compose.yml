@@ -95,3 +95,9 @@ networks:
   mean-network:
     driver: bridge
     name: mean-network
+
+networks:
+  mean-network:
+    driver: bridge
+    name: mean-network
+
