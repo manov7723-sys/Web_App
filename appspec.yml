@@ -11,6 +11,8 @@ files:
   - source: scripts
     destination: /home/ubuntu/scripts
 
+file_exists_behavior: OVERWRITE
+
 permissions:
   - object: /home/ubuntu/scripts
     pattern: "*.sh"
