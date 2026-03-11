@@ -19,21 +19,16 @@ phases:
     commands:
       - echo "Building Angular frontend"
       - cd frontend
-      - npx ng build --configuration production
-      - cd ..
-
-      - echo "Installing backend dependencies"
-      - cd backend
-      - npm install
+      - ng build --configuration production
       - cd ..
 
   post_build:
     commands:
-      - echo "Build completed successfully"
+      - echo "Build completed"
 
 artifacts:
   files:
     - appspec.yml
-    - frontend/**/*
+    - frontend/dist/**/*
     - backend/**/*
     - scripts/**/*
