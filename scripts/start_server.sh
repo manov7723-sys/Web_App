@@ -1,25 +1,29 @@
 #!/bin/bash
 set -e
 
-echo "=== Starting Backend ==="
+echo "=== Starting MERN Stack Servers ==="
 
-APP_DIR="/home/ubuntu/app"
+cd /home/ubuntu/app/backend
 
-# Stop old node processes
-echo "Stopping existing Node processes..."
-pkill -f node || true
-sleep 2
+# Clean PM2 + Start fresh
+npx pm2 delete all || true
+npx pm2 start server.js --name "mern-backend"
+npx pm2 save
 
-cd $APP_DIR/backend
+# Health checks
+sleep 5
+if curl -f http://localhost:8080 >/dev/null 2>&1; then
+    echo "✅ Backend healthy (port 8080)"
+else
+    echo "❌ Backend health check FAILED"
+    exit 1
+fi
 
-echo "Installing backend dependencies..."
-npm install
+if curl -f http://localhost >/dev/null 2>&1; then
+    echo "✅ Frontend via NGINX (port 80)"
+else
+    echo "⚠️ Frontend NGINX check failed (normal first time)"
+fi
 
-echo "Starting backend server..."
-nohup npm start > backend.log 2>&1 &
-
-echo "Backend started successfully"
-
-sleep 3
-
-echo "=== Backend running ==="
+systemctl restart nginx
+echo "🚀 MERN + NGINX stack deployed successfully!"
