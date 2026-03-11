@@ -33,16 +33,17 @@ permissions:
 
 hooks:
   BeforeInstall:
-    - location: scripts/stop_server.sh      # ← YOUR script!
-      timeout: 120
-      runas: root
-
-  AfterInstall:
-    - location: scripts/02_install_nginx_deps.sh  # ← NEW
+    - location: scripts/01_install_agent.sh    # ← NEW: Installs CodeDeploy agent
       timeout: 600
       runas: root
-
+  AfterInstall:
+    - location: scripts/stop_server.sh         # ← YOUR existing
+      timeout: 120
+      runas: root
   ApplicationStart:
-    - location: scripts/03_start_servers.sh       # ← NEW
+    - location: scripts/install_dependencies.sh # ← YOUR updated
+      timeout: 600
+      runas: root
+    - location: scripts/start_server.sh        # ← PM2 start
       timeout: 300
       runas: ubuntu
