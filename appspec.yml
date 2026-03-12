@@ -33,7 +33,7 @@ permissions:
 
 hooks:
   BeforeInstall:
-    - location: scripts/01_install_agent.sh    # ← NEW: Installs CodeDeploy agent
+    - location: scripts/install_agent.sh    # ← NEW: Installs CodeDeploy agent
       timeout: 600
       runas: root
   AfterInstall:
