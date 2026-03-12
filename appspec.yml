@@ -24,6 +24,12 @@ permissions:
     owner: ubuntu
     group: ubuntu
     type: [file]
+  - object: /home/ubuntu/app/frontend/dist  
+    pattern: "**"
+    mode: 755    
+    owner: ubuntu
+    group: ubuntu
+    type: [file, directory]
   - object: /home/ubuntu/app/frontend
     pattern: "**"
     mode: 644
