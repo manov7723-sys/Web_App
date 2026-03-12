@@ -32,8 +32,10 @@ phases:
       - cp -r scripts deployment/
       - chmod 755 deployment/scripts/*.sh
       - cd deployment
-      - zip -r ../codedeploy.zip .
+      - zip -r ../codedeploy.zip *
       - cd ..
+      - echo "Checking zip contents"
+      - unzip -l codedeploy.zip
 
 artifacts:
   files:
