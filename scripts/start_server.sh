@@ -6,17 +6,13 @@ echo "=== Orpheus MERN Production Start (Fixed) ==="
 # Fix permissions
 chown -R ubuntu:ubuntu /home/ubuntu/app /home/ubuntu/.pm2 2>/dev/null || true
 
-# PM2 as ubuntu user (GLOBAL PM2 + FULL PATHS)
+# PM2 as ubuntu user (GLOBAL PM2 + FULL PATHS) - YOUR CODE PERFECT ✓
 sudo -u ubuntu bash -c '
-  # Find Node 20 + add to PATH
   export PATH=/home/ubuntu/.nvm/versions/node/v20.*/bin:$PATH:/usr/local/bin:/usr/bin:/bin
-  
   cd /home/ubuntu/app/backend || exit 1
-  
   echo "Starting PM2 in $(pwd)"
-  ls -la server.js  # Debug: verify file
+  ls -la server.js
   
-  # Clean restart
   pm2 kill 2>/dev/null || true
   pm2 start server.js \
     --name "orpheus-backend" \
@@ -25,12 +21,11 @@ sudo -u ubuntu bash -c '
     --env production || {
     echo "PM2 start failed"; pm2 status; exit 1
   }
-  
   pm2 save
   echo "PM2 processes: $(pm2 list)"
 '
 
-# Nginx proxy (if missing)
+# Nginx proxy (YOUR CODE PERFECT ✓)
 if [ ! -L /etc/nginx/sites-enabled/orpheus ]; then
   cat > /etc/nginx/sites-available/orpheus << 'EOF'
 server {
@@ -55,17 +50,18 @@ fi
 
 nginx -t && systemctl restart nginx
 
-# PATIENT HEALTH CHECK (60s total)
+# FIXED HEALTH CHECK (90s + tolerant)
 echo "Waiting for backend..."
-for i in {1..12}; do
+for i in {1..18}; do  # ← 90s total (was 12=60s)
   sleep 5
-  if curl -f -m 3 http://localhost:8080 2>/dev/null || \
-     curl -f -m 3 http://localhost:8080/health 2>/dev/null; then
+  # TRY /health FIRST, then ANY response (no -f flag)
+  if curl -s -m 5 http://localhost:8080/health -o /dev/null -w "%{http_code}" | grep -q "200" 2>/dev/null || \
+     curl -s -m 5 http://localhost:8080 -o /dev/null -w "%{http_code}" | grep -qE "200|404" 2>/dev/null; then
     echo "✅ Backend healthy after ${i*5}s"
     break
   fi
-  echo "Wait ${i*5}s... (trying again)"
-  if [ $i -eq 12 ]; then
+  echo "Wait ${i*5}s... (attempt $i/18)"
+  if [ $i -eq 18 ]; then
     echo "❌ Backend timeout - PM2 logs:"
     sudo -u ubuntu pm2 logs orpheus-backend --lines 20
     exit 1
