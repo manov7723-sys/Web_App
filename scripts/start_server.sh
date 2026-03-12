@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Orpheus MERN Production Start (25s PROVEN) ==="
+echo "=== Orpheus MERN Production Start (45s PROVEN) ==="
 
 # Fix permissions
 chown -R ubuntu:ubuntu /home/ubuntu/app /home/ubuntu/.pm2 2>/dev/null || true
