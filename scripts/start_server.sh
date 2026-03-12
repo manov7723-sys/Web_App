@@ -1,51 +1,77 @@
 #!/bin/bash
 set -e
 
-echo "=== Production MERN Start (PM2 Cluster + Nginx) ==="
+echo "=== Orpheus MERN Production Start (Fixed) ==="
 
-# Fix permissions first
-chown -R ubuntu:ubuntu /home/ubuntu/app /home/ubuntu/.pm2
+# Fix permissions
+chown -R ubuntu:ubuntu /home/ubuntu/app /home/ubuntu/.pm2 2>/dev/null || true
 
-# Switch to ubuntu user properly
-sudo -u ubuntu bash << 'EOF'
-  export PATH=/usr/local/bin:/usr/bin:/bin:/home/ubuntu/.nvm/versions/node/v20.*/bin
-  cd /home/ubuntu/app/backend
+# PM2 as ubuntu user (GLOBAL PM2 + FULL PATHS)
+sudo -u ubuntu bash -c '
+  # Find Node 20 + add to PATH
+  export PATH=/home/ubuntu/.nvm/versions/node/v20.*/bin:$PATH:/usr/local/bin:/usr/bin:/bin
   
-  # Kill old processes
-  pm2 kill || true
+  cd /home/ubuntu/app/backend || exit 1
   
-  # Start with CLUSTER MODE (uses all CPUs)
-  pm2 start server.js \\
-    --name "orpheus-backend" \\
-    --instances "max" \\
-    --max-memory-restart 500M \\
-    -i 0 \\
-    --env production
+  echo "Starting PM2 in $(pwd)"
+  ls -la server.js  # Debug: verify file
+  
+  # Clean restart
+  pm2 kill 2>/dev/null || true
+  pm2 start server.js \
+    --name "orpheus-backend" \
+    --instances "max" \
+    --max-memory-restart 500M \
+    --env production || {
+    echo "PM2 start failed"; pm2 status; exit 1
+  }
   
   pm2 save
-  pm2 startup --hp /home/ubuntu
-EOF
+  echo "PM2 processes: $(pm2 list)"
+'
 
-# Nginx setup
-if [ ! -L /etc/nginx/sites-enabled/mern-app ]; then
-  ln -sf /etc/nginx/sites-available/mern-app /etc/nginx/sites-enabled/
+# Nginx proxy (if missing)
+if [ ! -L /etc/nginx/sites-enabled/orpheus ]; then
+  cat > /etc/nginx/sites-available/orpheus << 'EOF'
+server {
+    listen 80 default_server;
+    root /home/ubuntu/app/frontend;
+    index index.html;
+    
+    location /api {
+        proxy_pass http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+EOF
+  ln -sf /etc/nginx/sites-available/orpheus /etc/nginx/sites-enabled/
 fi
 
 nginx -t && systemctl restart nginx
 
-# HEALTH CHECK with RETRY (30s timeout)
-for i in {1..6}; do
+# PATIENT HEALTH CHECK (60s total)
+echo "Waiting for backend..."
+for i in {1..12}; do
   sleep 5
-  if curl -f -m 5 http://localhost:8080/health || curl -f -m 5 http://localhost:8080 2>/dev/null; then
+  if curl -f -m 3 http://localhost:8080 2>/dev/null || \
+     curl -f -m 3 http://localhost:8080/health 2>/dev/null; then
     echo "✅ Backend healthy after ${i*5}s"
     break
-  elif [ $i -eq 6 ]; then
-    echo "❌ Backend failed healthcheck"
-    pm2 logs orpheus-backend --lines 20
+  fi
+  echo "Wait ${i*5}s... (trying again)"
+  if [ $i -eq 12 ]; then
+    echo "❌ Backend timeout - PM2 logs:"
+    sudo -u ubuntu pm2 logs orpheus-backend --lines 20
     exit 1
   fi
 done
 
-echo "🚀 Orpheus MERN deployed! PM2 status:"
+echo "✅ Deployment SUCCEEDED!"
 sudo -u ubuntu pm2 status
 exit 0
