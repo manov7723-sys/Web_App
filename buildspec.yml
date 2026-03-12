@@ -20,7 +20,6 @@ phases:
 
  post_build:
   commands:
-    - echo "🎯 Creating CodeDeploy bundle..."
     - mkdir deployment
     - cp appspec.yml deployment/
     - cp -r frontend/dist deployment/frontend/
@@ -28,9 +27,7 @@ phases:
     - cp -r scripts deployment/
     - chmod 755 deployment/scripts/*.sh
     - cd deployment && zip -r ../codedeploy.zip .
-    - cd ..
-    - aws s3 cp codedeploy.zip s3://codepipeline-us-east-1-d26d85020b51-41c2-83b1-5094ad033d74/codedeploy.zip
-    
+
 artifacts:
   files:
     - codedeploy.zip  # ← ONLY THIS FILE!
