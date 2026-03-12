@@ -45,14 +45,14 @@ server {
 
     # Frontend React (static files)
     location / {
-        root /home/ubuntu/app/frontend/build;
+        root /home/ubuntu/app/frontend/dist;
         index index.html;
         try_files $uri /index.html;
     }
 
     # Backend API proxy (remove trailing slash for clean URLs)
-    location /api {
-        proxy_pass http://localhost:8080;
+    location /api/ {
+        proxy_pass http://localhost:8080/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
