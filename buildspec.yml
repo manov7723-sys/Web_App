@@ -28,7 +28,7 @@ phases:
       - cp -r scripts deployment/              # ← ROOT LEVEL!
       - chmod 755 deployment/scripts/*.sh
       - cd deployment && zip -r ../codedeploy.zip .
-      - aws s3 cp codedeploy.zip s3://your-bucket-name/codedeploy.zip
+      - aws s3 cp codedeploy.zip s3://codepipeline-us-east-1-d26d85020b51-41c2-83b1-5094ad033d74/codedeploy.zip
 
 artifacts:
   files:
