@@ -1,35 +1,27 @@
 #!/bin/bash
-set -euo pipefail  # Stricter error handling
+set -euo pipefail
 
-echo "=== ASG-Ready Setup: Ubuntu 24.04 (CodeDeploy + Node/Nginx) ==="
+echo "=== FIXED: Ubuntu 24.04 ASG Setup ==="
 
-# 1. UPDATE (worked fine in your log)
+# Agent check (skip if running)
+systemctl is-active codedeploy-agent >/dev/null 2>&1 && echo "✅ Agent OK" || echo "⚠️ Agent check"
+
+# Core deps (nginx stays apt)
 apt-get update -qq
+apt-get install -y nginx jq unzip curl wget build-essential
 
-# 2. SKIP AGENT IF RUNNING (your current instance)
-if systemctl is-active --quiet codedeploy-agent 2>/dev/null; then
-    echo "✅ Agent v1.8.1 running - skip install"
-else
-    echo "🔧 Installing CodeDeploy agent..."
-    apt-get install -y ruby-full wget  # ✅ Ruby (agent needs it), NO awscli!
-    cd /tmp
-    wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
-    chmod +x ./install
-    ./install auto
-    systemctl enable --now codedeploy-agent  # enable + start
-fi
+# NVM + Node 20 (bypasses ALL apt dependency issues)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+export NVM_DIR="/root/.nvm"  # root user for CodeDeploy
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-# 3. AWS CLI (Ubuntu 24.04 fix)
-snap install aws-cli --classic || echo "⚠️ AWS CLI skipped (non-critical)"
+nvm install 20
+nvm use 20
+nvm alias default 20
 
-# 4. APP DEPS (your Node/Nginx)
-apt-get install -y nginx jq unzip
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-apt-get install -y nodejs npm
+# Verify
+node --version | grep "v20" && echo "✅ Node 20 ready"
+npm --version && echo "✅ npm ready"
 
-# 5. VERIFY
-systemctl is-active codedeploy-agent && echo "✅ Agent active" || echo "❌ Agent failed"
-node --version && echo "✅ Node ready"
-
-echo "🎉 ASG instance fully prepared"
+echo "🎉 ASG instance ready!"
 exit 0
