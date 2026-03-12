@@ -11,24 +11,25 @@ phases:
   pre_build:
     commands:
       - echo "Installing frontend dependencies"
-      - cd frontend
-      - npm install
-      - cd ..
+      - cd frontend && npm install && cd ..
 
   build:
     commands:
       - echo "Building Angular frontend"
-      - cd frontend
-      - ng build --configuration production
-      - cd ..
+      - cd frontend && ng build --configuration production && cd ..
 
-  post_build:
+  post_build:  # ← ADD THIS SECTION!
     commands:
-      - echo "Build completed"
+      - echo "🎯 Creating CodeDeploy bundle..."
+      - mkdir deployment
+      - cp appspec.yml deployment/
+      - cp -r frontend/dist deployment/frontend/  
+      - cp -r backend deployment/
+      - cp -r scripts deployment/              # ← ROOT LEVEL!
+      - chmod 755 deployment/scripts/*.sh
+      - cd deployment && zip -r ../codedeploy.zip .
+      - aws s3 cp codedeploy.zip s3://your-bucket-name/codedeploy.zip
 
 artifacts:
   files:
-    - appspec.yml
-    - frontend/dist/**/*
-    - backend/**/*
-    - scripts/**/*
+    - codedeploy.zip  # ← ONLY THIS FILE!
