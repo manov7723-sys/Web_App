@@ -25,16 +25,8 @@ phases:
   post_build:
     commands:
       - echo "Creating CodeDeploy bundle"
-      - mkdir deployment
-      - cp appspec.yml deployment/
-      - cp -r frontend/dist deployment/frontend/
-      - cp -r backend deployment/
-      - cp -r scripts deployment/
-      - chmod 755 deployment/scripts/*.sh
-      - cd deployment
-      - zip -r ../codedeploy.zip *
-      - cd ..
-      - echo "Checking zip contents"
+      - zip -r codedeploy.zip appspec.yml backend frontend/dist scripts
+      - echo "Verify zip"
       - unzip -l codedeploy.zip
 
 artifacts:
