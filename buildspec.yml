@@ -18,15 +18,15 @@ phases:
       - echo "Building Angular frontend"
       - cd frontend && ng build --configuration production && cd ..
 
- post_build:
-  commands:
-    - mkdir deployment
-    - cp appspec.yml deployment/
-    - cp -r frontend/dist deployment/frontend/
-    - cp -r backend deployment/
-    - cp -r scripts deployment/
-    - chmod 755 deployment/scripts/*.sh
-    - cd deployment && zip -r ../codedeploy.zip .
+  post_build:
+    commands:
+      - mkdir deployment
+      - cp appspec.yml deployment/
+      - cp -r frontend/dist deployment/frontend/
+      - cp -r backend deployment/
+      - cp -r scripts deployment/
+      - chmod 755 deployment/scripts/*.sh
+      - cd deployment && zip -r ../codedeploy.zip .
 
 artifacts:
   files:
