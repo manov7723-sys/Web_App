@@ -23,9 +23,9 @@ permissions:
     group: ubuntu
     
   - object: /home/ubuntu/app/frontend/dist/angular-15-crud/**
-    mode: 755      
-    owner: ubuntu
-    group: ubuntu
+    mode: 755
+    owner: www-data
+    group: www-data
     
   - object: /home/ubuntu/app/frontend/**  
     mode: 644      

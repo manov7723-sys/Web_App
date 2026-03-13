@@ -18,7 +18,7 @@ server {
     }
 
     location /api/ {
-        proxy_pass http://localhost:8080/;
+        proxy_pass http://127.0.0.1:8080/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -28,7 +28,7 @@ server {
 
     # ALB health check
     location = /health {
-        proxy_pass http://localhost:8080/health;
+        proxy_pass http://127.0.0.1:8080/health;
     }
 }
 EOF
@@ -52,6 +52,11 @@ if [ -f "$APP_DIR/backend/package.json" ]; then
         cd $APP_DIR/backend && npm install
     "
 fi
+
+# Fix permissions for NGINX (www-data needs to traverse /home/ubuntu)
+chmod 755 /home/ubuntu
+chmod -R 755 /home/ubuntu/app/frontend/dist
+chown -R ubuntu:ubuntu /home/ubuntu/app
 
 echo "✅ Dependencies installed"
 exit 0
