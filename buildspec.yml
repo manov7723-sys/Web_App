@@ -7,11 +7,17 @@ phases:
     commands:
       - echo "Installing Angular CLI"
       - npm install -g @angular/cli
-      - node --version
-      - ng version
 
   pre_build:
     commands:
+      - echo "=== WHERE AM I ==="
+      - pwd
+      - echo "=== WHAT FILES ARE HERE ==="
+      - ls -la
+      - echo "=== CHECKING FRONTEND ==="
+      - ls -la frontend/ || echo "❌ frontend NOT FOUND"
+      - echo "=== CHECKING BACKEND ==="
+      - ls -la backend/ || echo "❌ backend NOT FOUND"
       - echo "Installing frontend dependencies"
       - cd frontend && npm install
 
