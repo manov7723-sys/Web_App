@@ -5,18 +5,36 @@ echo "=== Installing dependencies ==="
 
 APP_DIR="/home/ubuntu/app"
 
-# Single clean NGINX config
+# Fix parent directory permissions FIRST (NGINX needs to traverse these)
+chmod 755 /home/ubuntu
+chmod 755 /home/ubuntu/app
+chmod 755 /home/ubuntu/app/frontend
+chmod 755 /home/ubuntu/app/frontend/dist
+chmod -R 755 /home/ubuntu/app/frontend/dist/angular-15-crud
+
+# Single clean NGINX config with proper static file serving
 cat > /etc/nginx/sites-available/orpheus << 'EOF'
 server {
     listen 80 default_server;
     server_name _;
 
-    location / {
+    root /home/ubuntu/app/frontend/dist/angular-15-crud;
+    index index.html;
+
+    # Serve static files directly (JS, CSS, images, fonts)
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
         root /home/ubuntu/app/frontend/dist/angular-15-crud;
-        index index.html;
-        try_files $uri /index.html;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
     }
 
+    # Angular routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API proxy
     location /api/ {
         proxy_pass http://127.0.0.1:8080/;
         proxy_http_version 1.1;
@@ -53,9 +71,12 @@ if [ -f "$APP_DIR/backend/package.json" ]; then
     "
 fi
 
-# Fix permissions for NGINX (www-data needs to traverse /home/ubuntu)
+# Fix permissions for NGINX
 chmod 755 /home/ubuntu
-chmod -R 755 /home/ubuntu/app/frontend/dist
+chmod 755 /home/ubuntu/app
+chmod 755 /home/ubuntu/app/frontend
+chmod 755 /home/ubuntu/app/frontend/dist
+chmod -R 755 /home/ubuntu/app/frontend/dist/angular-15-crud
 chown -R ubuntu:ubuntu /home/ubuntu/app
 
 echo "✅ Dependencies installed"
