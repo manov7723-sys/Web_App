@@ -22,7 +22,7 @@ permissions:
     owner: ubuntu
     group: ubuntu
     
-  - object: /home/ubuntu/app/frontend/dist/**
+  - object: /home/ubuntu/app/frontend/dist/angular-15-crud/**
     mode: 755      
     owner: ubuntu
     group: ubuntu
@@ -31,23 +31,30 @@ permissions:
     mode: 644      
     owner: ubuntu
     group: ubuntu
-    except:        # Exclude dist/ overlap
-    - "/dist/**"
+    except:
+      - "/dist/angular-15-crud/**"
 
 
 hooks:
   BeforeInstall:
-    - location: scripts/install_agent.sh    # ← NEW: Installs CodeDeploy agent
+    - location: scripts/install_agent.sh
       timeout: 600
       runas: root
+
   AfterInstall:
-    - location: scripts/stop_server.sh         # ← YOUR existing
+    - location: scripts/stop_server.sh
       timeout: 120
       runas: root
-  ApplicationStart:
-    - location: scripts/install_dependencies.sh # ← YOUR updated
+    - location: scripts/install_dependencies.sh
       timeout: 600
       runas: root
-    - location: scripts/start_server.sh        # ← PM2 start
+
+  ApplicationStart:
+    - location: scripts/start_server.sh
       timeout: 300
+      runas: root
+
+  ValidateService:
+    - location: scripts/validate_service.sh
+      timeout: 120
       runas: ubuntu

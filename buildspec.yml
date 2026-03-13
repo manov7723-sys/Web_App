@@ -11,24 +11,24 @@ phases:
   pre_build:
     commands:
       - echo "Installing frontend dependencies"
-      - cd frontend
-      - npm install
-      - cd ..
+      - cd frontend && npm install
 
   build:
     commands:
       - echo "Building Angular frontend"
-      - cd frontend
-      - ng build --configuration production
-      - cd ..
+      - cd frontend && ng build --configuration production
+      - echo "Installing backend dependencies"
+      - cd backend && npm install --omit=dev
 
   post_build:
     commands:
       - echo "Build completed successfully"
+      - echo "Build timestamp $(date)"
 
 artifacts:
   files:
     - appspec.yml
     - backend/**/*
-    - frontend/dist/**/*
+    - frontend/dist/angular-15-crud/**/*
     - scripts/**/*
+  discard-paths: no
