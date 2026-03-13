@@ -17,5 +17,18 @@ sudo -u ubuntu bash -c '
   npm install -g pm2
 '
 
+# Enable CodeDeploy agent debug logging
+echo "=== Enabling CodeDeploy debug logging ==="
+if [ -f /etc/codedeploy-agent/conf/codedeployagent.conf ]; then
+    sed -i '/:log_level:/d' /etc/codedeploy-agent/conf/codedeployagent.conf
+    sed -i '/:verbose:/d' /etc/codedeploy-agent/conf/codedeployagent.conf
+    echo ":log_level: debug" >> /etc/codedeploy-agent/conf/codedeployagent.conf
+    echo ":verbose: true" >> /etc/codedeploy-agent/conf/codedeployagent.conf
+    systemctl restart codedeploy-agent || true
+    echo "✅ Debug logging enabled"
+else
+    echo "⚠️ CodeDeploy config not found"
+fi
+
 echo "✅ Instance ready"
 exit 0
