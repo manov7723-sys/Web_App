@@ -15,6 +15,11 @@ sudo -u ubuntu bash -c '
     pm2 list
 '
 
+# Fix permissions for NGINX after PM2 start
+chmod 755 /home/ubuntu
+chmod -R 755 /home/ubuntu/app/frontend/dist
+chown -R ubuntu:ubuntu /home/ubuntu/app
+
 # Wait and validate
 sleep 5
 curl -sf http://localhost:8080/health || { echo "❌ Backend not responding on 8080"; exit 1; }
