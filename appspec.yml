@@ -22,7 +22,7 @@ permissions:
     owner: ubuntu
     group: ubuntu
     
-  - object: /home/ubuntu/app/frontend/dist/**
+  - object: /home/ubuntu/app/frontend/dist/angular-15-crud/**
     mode: 755      
     owner: ubuntu
     group: ubuntu
@@ -32,7 +32,7 @@ permissions:
     owner: ubuntu
     group: ubuntu
     except:
-      - "/dist/**"
+      - "/dist/angular-15-crud/**"
 
 
 hooks:
@@ -45,16 +45,16 @@ hooks:
     - location: scripts/stop_server.sh
       timeout: 120
       runas: root
-    - location: scripts/install_dependencies.sh  # ← moved here from ApplicationStart
+    - location: scripts/install_dependencies.sh
       timeout: 600
       runas: root
 
   ApplicationStart:
     - location: scripts/start_server.sh
       timeout: 300
-      runas: root                                 # ← changed from ubuntu to root
+      runas: root
 
   ValidateService:
-    - location: scripts/validate_service.sh       # ← NEW
+    - location: scripts/validate_service.sh
       timeout: 120
       runas: ubuntu
