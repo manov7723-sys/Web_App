@@ -11,11 +11,11 @@ server {
     listen 80 default_server;
     server_name _;
 
-   location / {
-    root /home/ubuntu/app/frontend/dist/angular-15-crud;
-    index index.html;
-    try_files $uri /index.html;
-}
+    location / {
+        root /home/ubuntu/app/frontend/dist/angular-15-crud;
+        index index.html;
+        try_files $uri /index.html;
+    }
 
     location /api/ {
         proxy_pass http://localhost:8080/;
@@ -40,8 +40,12 @@ ln -sf /etc/nginx/sites-available/orpheus /etc/nginx/sites-enabled/
 nginx -t
 systemctl restart nginx
 
-# Install backend dependencies
+# Fix ownership FIRST before npm install
+chown -R ubuntu:ubuntu /home/ubuntu/app
+
+# Install backend dependencies as ubuntu user
 if [ -f "$APP_DIR/backend/package.json" ]; then
+    echo "Installing backend dependencies..."
     sudo -u ubuntu bash -c "
         export NVM_DIR='/home/ubuntu/.nvm'
         [ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\"
@@ -49,6 +53,5 @@ if [ -f "$APP_DIR/backend/package.json" ]; then
     "
 fi
 
-chown -R ubuntu:ubuntu /home/ubuntu/app
 echo "✅ Dependencies installed"
 exit 0
