@@ -1,23 +1,14 @@
 #!/bin/bash
-set -e
 
-echo "=== Stopping existing Node.js servers (if any) ==="
+echo "=== Stopping application ==="
 
-# Kill Node.js processes serving your app
-pkill -f "/home/ubuntu/app.*node" 2>/dev/null || true
-pkill -f "/home/ubuntu/app.*npm"  2>/dev/null || true
-pkill -f "npm start"              2>/dev/null || true
-pkill -f "node server"            2>/dev/null || true
-pkill pm2                         2>/dev/null || true
+sudo -u ubuntu bash -c '
+    export NVM_DIR="/home/ubuntu/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    pm2 delete orpheus-backend 2>/dev/null || true
+    pm2 save 2>/dev/null || true
+' || true
 
-# Wait for graceful shutdown
-sleep 3
-
-# Verify no Node processes remain
-if pgrep -f node >/dev/null 2>&1; then
-    echo "WARNING: Some Node processes still running"
-else
-    echo "=== All servers stopped successfully ==="
-fi
-
+sleep 2
+echo "✅ Application stopped"
 exit 0
