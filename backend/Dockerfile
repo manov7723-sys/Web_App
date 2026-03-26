@@ -14,7 +14,7 @@ RUN npm install
 COPY . .
 
 # Step 6 Expose backend port
-EXPOSE 3000
+EXPOSE 8080
 
 # Step 7 Command to start the backend server
 CMD ["node", "server.js"]
