@@ -20,6 +20,11 @@ services:
         parallelism: 1
         delay: 5s
         monitor: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]   # frontend check
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   backend:
     image: 945219712738.dkr.ecr.us-east-1.amazonaws.com/myapp1_backend:backend-${IMAGE_TAG}
@@ -40,6 +45,11 @@ services:
         parallelism: 1
         delay: 5s
         monitor: 30s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]  # backend health endpoint
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   mongo:
     image: mongo:6.0
@@ -51,6 +61,11 @@ services:
       replicas: 1
       restart_policy:
         condition: any
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   mongo-data:
