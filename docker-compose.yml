@@ -1,9 +1,8 @@
 version: "3.8"
 
 services:
-
   frontend:
-    image: myapp-frontend:${GITHUB_SHA}
+    image: 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend-${IMAGE_TAG}
     ports:
       - "80:80"
     networks:
@@ -23,7 +22,7 @@ services:
         monitor: 30s
 
   backend:
-    image: myapp-backend:${GITHUB_SHA}
+    image: 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend-${IMAGE_TAG}
     environment:
       - MONGO_URI=mongodb://mongo:27017/mydatabase
     networks:
