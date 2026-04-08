@@ -1,41 +1,77 @@
 name: Deploy to EC2
 
 on:
-  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build and Push to ECR"]
+    types: [completed]
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     permissions:
       id-token: write
       contents: read
 
-    steps:
-      - uses: actions/checkout@v4
+    env:
+      AWS_REGION: us-east-1
+      ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
+      ECR_REPOSITORY: my-app1
 
-      - uses: aws-actions/configure-aws-credentials@v4
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::945219712738:role/GithubAction
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
-      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Set image tag
+        run: |
+          TAG=${{ github.event.workflow_run.head_sha }}
+          echo "IMAGE_TAG=${TAG::8}" >> $GITHUB_ENV
 
-      - uses: appleboy/ssh-action@v1.0.3
+      # ✅ Copy compose file to EC2
+      - name: Copy docker-compose to EC2
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 945219712738.dkr.ecr.us-east-1.amazonaws.com
-            docker pull 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
-            docker pull 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
-            docker network create my-app-network || true
-            docker stop mongodb backend frontend || true
-            docker rm mongodb backend frontend || true
-            docker run -d --name mongodb --network my-app-network -p 27017:27017 mongo
-            docker run -d --name backend --network my-app-network -p 5000:5000 -e MONGO_URL="mongodb://mongodb:27017/mydb" 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
-            docker run -d --name frontend --network my-app-network -p 80:3000 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
-            docker run -d --name backend --network my-app-network -p 5000:3000 -e MONGO_URL="mongodb://mongodb:27017/mydb" 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend
-            docker run -d --name frontend --network my-app-network -p 3000:80 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend
+          source: "docker-compose.yml"
+          target: "/home/ubuntu/app"
 
+      - name: Deploy with Docker Swarm
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_TAG,ECR_REGISTRY,ECR_REPOSITORY
+          script: |
+            # ECR Login on EC2
+            aws ecr get-login-password --region us-east-1 | docker login \
+              --username AWS --password-stdin $ECR_REGISTRY
+
+            # Pull images before deploy (swarm needs images pre-pulled)
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$IMAGE_TAG
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:backend-$IMAGE_TAG
+
+            # ✅ Init swarm if not already active
+            docker swarm init || true
+
+            cd /home/ubuntu/app
+
+            # ✅ Deploy or update the stack using docker stack deploy
+            IMAGE_TAG=$IMAGE_TAG \
+            docker stack deploy \
+              --compose-file docker-compose.yml \
+              --with-registry-auth \
+              myapp
+
+            # ✅ Verify all services are running
+            docker stack services myapp
