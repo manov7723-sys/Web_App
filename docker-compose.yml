@@ -1,32 +1,61 @@
-version: '3.8'
+version: "3.8"
 
 services:
+
   frontend:
-    build: ./frontend
-    container_name: frontend
+    image: myapp-frontend:${GITHUB_SHA}
     ports:
       - "80:80"
+    networks:
+      - app-network
     depends_on:
       - backend
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        monitor: 30s
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        monitor: 30s
 
   backend:
-    build: ./backend
-    container_name: backend
-    ports:
-      - "8080:8080"
+    image: myapp-backend:${GITHUB_SHA}
     environment:
-      MONGO_URI: mongodb://mongo:27017/mydatabase
+      - MONGO_URI=mongodb://mongo:27017/mydatabase
+    networks:
+      - app-network
     depends_on:
       - mongo
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        monitor: 30s
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        monitor: 30s
 
   mongo:
     image: mongo:6.0
-    container_name: mongo
-    restart: always
-    ports:
-      - "27017:27017"
     volumes:
       - mongo-data:/data/db
+    networks:
+      - app-network
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
 
 volumes:
   mongo-data:
+
+networks:
+  app-network:
+    driver: overlay
