@@ -25,18 +25,29 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Get IMAGE_TAG from CI workflow
+        id: get_tag
+        uses: actions/github-script@v7
         with:
-          role-to-assume: arn:aws:iam::945219712738:role/GithubAction
-          aws-region: ${{ env.AWS_REGION }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const run_id = ${{ github.event.workflow_run.id }};
+            const { data: runs } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run_id
+            });
+            // Assuming the artifact name is "image_tag"
+            if (!runs.artifacts || runs.artifacts.length === 0) {
+              core.setFailed("No artifacts found from CI run");
+            } else {
+              core.setOutput("IMAGE_TAG", runs.artifacts[0].name);
+            }
 
-      - name: Set image tag
-        run: |
-          TAG=${{ github.event.workflow_run.head_sha }}
-          echo "IMAGE_TAG=${TAG::8}" >> $GITHUB_ENV
+      - name: Set IMAGE_TAG as env
+        run: echo "IMAGE_TAG=${{ steps.get_tag.outputs.IMAGE_TAG }}" >> $GITHUB_ENV
 
-      # ✅ Copy compose file to EC2
+      # Copy compose file to EC2
       - name: Copy docker-compose to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -46,6 +57,7 @@ jobs:
           source: "docker-compose.yml"
           target: "/home/ubuntu/app"
 
+      # Deploy with Docker Swarm
       - name: Deploy with Docker Swarm
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -55,24 +67,23 @@ jobs:
           envs: IMAGE_TAG,ECR_REGISTRY,ECR_REPOSITORY,ECR_REPOSITORY1
           script: |
             # ECR Login on EC2
-            aws ecr get-login-password --region us-east-1 | docker login \
+            aws ecr get-login-password --region $AWS_REGION | docker login \
               --username AWS --password-stdin $ECR_REGISTRY
 
-            # Pull images before deploy (swarm needs images pre-pulled)
+            # Pull the exact images built in CI
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$IMAGE_TAG
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$IMAGE_TAG
 
-            # ✅ Init swarm if not already active
+            # Init swarm if not already active
             docker swarm init || true
 
             cd /home/ubuntu/app
 
-            # ✅ Deploy or update the stack using docker stack deploy
-            IMAGE_TAG=$IMAGE_TAG \
-            docker stack deploy \
+            # Deploy using exact IMAGE_TAG
+            IMAGE_TAG=$IMAGE_TAG docker stack deploy \
               --compose-file docker-compose.yml \
               --with-registry-auth \
               myapp
 
-            # ✅ Verify all services are running
+            # Verify all services
             docker stack services myapp
