@@ -46,7 +46,7 @@ services:
         delay: 5s
         monitor: 30s
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]  # backend health endpoint
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]  # backend health endpoint
       interval: 10s
       timeout: 5s
       retries: 3
