@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   frontend:
-    image: 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:frontend-${IMAGE_TAG}
+    image: 945219712738.dkr.ecr.us-east-1.amazonaws.com/myapp1_frontend:frontend-${IMAGE_TAG}
     ports:
       - "80:80"
     networks:
@@ -22,7 +22,7 @@ services:
         monitor: 30s
 
   backend:
-    image: 945219712738.dkr.ecr.us-east-1.amazonaws.com/my-app1:backend-${IMAGE_TAG}
+    image: 945219712738.dkr.ecr.us-east-1.amazonaws.com/myapp1_backend:backend-${IMAGE_TAG}
     environment:
       - MONGO_URI=mongodb://mongo:27017/mydatabase
     networks:
