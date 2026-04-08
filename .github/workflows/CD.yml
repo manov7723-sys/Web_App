@@ -18,7 +18,8 @@ jobs:
     env:
       AWS_REGION: us-east-1
       ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
-      ECR_REPOSITORY: my-app1
+      ECR_REPOSITORY: myapp1_frontend
+      ECR_REPOSITORY1: myapp1_backend
 
     steps:
       - name: Checkout Code
@@ -59,7 +60,7 @@ jobs:
 
             # Pull images before deploy (swarm needs images pre-pulled)
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$IMAGE_TAG
-            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:backend-$IMAGE_TAG
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$IMAGE_TAG
 
             # ✅ Init swarm if not already active
             docker swarm init || true
