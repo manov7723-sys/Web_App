@@ -5,10 +5,8 @@ app.use(express.json());
 
 // ✅ HEALTH CHECK PATH (used by Docker Swarm)
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    uptime: process.uptime(),
-    timestamp: new Date()
+  res.status(500).json({
+    status: 'unhealthy'
   });
 });
 
