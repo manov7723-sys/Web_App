@@ -13,7 +13,7 @@ jobs:
       contents: read
     env:
       AWS_REGION: us-east-1
-      ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
+      ECR_REGISTRY: 641628981128.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY: myapp1_frontend
       ECR_REPOSITORY1: myapp1_backend
     steps:
@@ -30,7 +30,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::945219712738:role/GithubAction
+          role-to-assume: arn:aws:iam::641628981128:role/github-action
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Setup SSH key for Bastion + Private EC2
