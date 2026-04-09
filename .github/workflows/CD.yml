@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy to Private EC2 via Bastion
 
 on:
   workflow_run:
@@ -22,9 +22,11 @@ jobs:
       ECR_REPOSITORY1: myapp1_backend
 
     steps:
+      # 1️⃣ Checkout code
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # 2️⃣ Set IMAGE_TAG based on workflow SHA
       - name: Set IMAGE_TAG
         run: |
           FULL_SHA="${{ github.event.workflow_run.head_sha }}"
@@ -32,52 +34,82 @@ jobs:
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "Using IMAGE_TAG=$IMAGE_TAG"
 
+      # 3️⃣ Configure AWS credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::945219712738:role/GithubAction
           aws-region: ${{ env.AWS_REGION }}
 
-      # ✅ Encode compose file so we can pass it via SSH without SCP
+      # 4️⃣ Setup SSH key and config for bastion + private EC2
+      - name: Setup SSH key for Bastion + Private EC2
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BASTION_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # SSH config with ProxyJump
+          cat >> ~/.ssh/config <<EOF
+          Host bastion
+              HostName ${{ secrets.BASTION_HOST }}
+              User ${{ secrets.BASTION_USER }}
+              IdentityFile ~/.ssh/deploy_key
+              StrictHostKeyChecking no
+
+          Host private-ec2
+              HostName ${{ secrets.PRIVATE_EC2_HOST }}
+              User ${{ secrets.PRIVATE_EC2_USER }}
+              IdentityFile ~/.ssh/deploy_key
+              ProxyJump bastion
+              StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
+
+      # 5️⃣ Encode docker-compose.yml to base64 (no SCP needed)
       - name: Encode docker-compose as base64
         run: |
           COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
           echo "COMPOSE_B64=$COMPOSE_B64" >> $GITHUB_ENV
 
-      # ✅ Single SSH step — no SCP needed at all
-      - name: Deploy with Docker Swarm
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          envs: IMAGE_TAG,ECR_REGISTRY,ECR_REPOSITORY,ECR_REPOSITORY1,AWS_REGION,COMPOSE_B64
-          script: |
+      # 6️⃣ Deploy to private EC2 via bastion
+      - name: Deploy with Docker Swarm via Bastion
+        run: |
+          ssh private-ec2 'bash -s' <<'EOF'
             set -e
             echo "Deploying IMAGE_TAG=$IMAGE_TAG"
 
-            # Write compose file directly from base64 — no SCP needed
+            # Create app folder and write docker-compose
             mkdir -p /home/ubuntu/app
             echo "$COMPOSE_B64" | base64 -d > /home/ubuntu/app/docker-compose.yml
 
-            # ECR login using EC2 IAM role
+            # Login to ECR using IAM role on EC2
             aws ecr get-login-password --region $AWS_REGION | docker login \
               --username AWS \
               --password-stdin $ECR_REGISTRY
 
-            # Pull exact images
+            # Pull Docker images
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$IMAGE_TAG
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$IMAGE_TAG
 
-            # Init swarm if not already active
+            # Init Docker Swarm if not active
             docker swarm init 2>/dev/null || true
 
             cd /home/ubuntu/app
             export IMAGE_TAG=$IMAGE_TAG
 
+            # Deploy stack
             docker stack deploy \
               --compose-file docker-compose.yml \
               --with-registry-auth \
               myapp
 
+            # Show deployed services
             docker stack services myapp
+          EOF
+        env:
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          ECR_REPOSITORY1: ${{ env.ECR_REPOSITORY1 }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          COMPOSE_B64: ${{ env.COMPOSE_B64 }}
