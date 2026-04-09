@@ -10,7 +10,7 @@ jobs:
     env:
       AWS_REGION: us-east-1
       # ✅ FIXED: Match the single ECR repo used in your CD (my-app1)
-      ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
+      ECR_REGISTRY: 641628981128.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY: myapp1_frontend
       ECR_REPOSITORY1: myapp1_backend
       
@@ -38,7 +38,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::945219712738:role/GithubAction
+          role-to-assume: arn:aws:iam::641628981128:role/github-action
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
