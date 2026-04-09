@@ -1,32 +1,25 @@
 name: Deploy to Private EC2 via Bastion
-
 on:
   workflow_run:
     workflows: ["Build and Push to ECR"]
     types: [completed]
     branches: [main]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     permissions:
       id-token: write
       contents: read
-
     env:
       AWS_REGION: us-east-1
       ECR_REGISTRY: 945219712738.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY: myapp1_frontend
       ECR_REPOSITORY1: myapp1_backend
-
     steps:
-      # 1️⃣ Checkout code
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 2️⃣ Set IMAGE_TAG based on workflow SHA
       - name: Set IMAGE_TAG
         run: |
           FULL_SHA="${{ github.event.workflow_run.head_sha }}"
@@ -34,28 +27,23 @@ jobs:
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
           echo "Using IMAGE_TAG=$IMAGE_TAG"
 
-      # 3️⃣ Configure AWS credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::945219712738:role/GithubAction
           aws-region: ${{ env.AWS_REGION }}
 
-      # 4️⃣ Setup SSH key and config for bastion + private EC2
       - name: Setup SSH key for Bastion + Private EC2
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.BASTION_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-
-          # SSH config with ProxyJump
           cat >> ~/.ssh/config <<EOF
           Host bastion
               HostName ${{ secrets.BASTION_HOST }}
               User ${{ secrets.BASTION_USER }}
               IdentityFile ~/.ssh/deploy_key
               StrictHostKeyChecking no
-
           Host private-ec2
               HostName ${{ secrets.PRIVATE_EC2_HOST }}
               User ${{ secrets.PRIVATE_EC2_USER }}
@@ -65,45 +53,30 @@ jobs:
           EOF
           chmod 600 ~/.ssh/config
 
-      # 5️⃣ Encode docker-compose.yml to base64 (no SCP needed)
       - name: Encode docker-compose as base64
         run: |
           COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
           echo "COMPOSE_B64=$COMPOSE_B64" >> $GITHUB_ENV
 
-      # 6️⃣ Deploy to private EC2 via bastion
       - name: Deploy with Docker Swarm via Bastion
         run: |
-          ssh private-ec2 'bash -s' <<'EOF'
+          ssh private-ec2 'bash -s' << EOF
             set -e
             echo "Deploying IMAGE_TAG=$IMAGE_TAG"
-
-            # Create app folder and write docker-compose
             mkdir -p /home/ubuntu/app
             echo "$COMPOSE_B64" | base64 -d > /home/ubuntu/app/docker-compose.yml
-
-            # Login to ECR using IAM role on EC2
             aws ecr get-login-password --region $AWS_REGION | docker login \
               --username AWS \
               --password-stdin $ECR_REGISTRY
-
-            # Pull Docker images
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$IMAGE_TAG
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$IMAGE_TAG
-
-            # Init Docker Swarm if not active
             docker swarm init 2>/dev/null || true
-
             cd /home/ubuntu/app
             export IMAGE_TAG=$IMAGE_TAG
-
-            # Deploy stack
             docker stack deploy \
               --compose-file docker-compose.yml \
               --with-registry-auth \
               myapp
-
-            # Show deployed services
             docker stack services myapp
           EOF
         env:
