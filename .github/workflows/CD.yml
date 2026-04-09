@@ -38,43 +38,34 @@ jobs:
           role-to-assume: arn:aws:iam::945219712738:role/GithubAction
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Create app directory on EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            mkdir -p /home/ubuntu/app    
+      # ✅ Encode compose file so we can pass it via SSH without SCP
+      - name: Encode docker-compose as base64
+        run: |
+          COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
+          echo "COMPOSE_B64=$COMPOSE_B64" >> $GITHUB_ENV
 
-      - name: Copy docker-compose to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml"
-          target: "/home/ubuntu/app"
-          overwrite: true
-
+      # ✅ Single SSH step — no SCP needed at all
       - name: Deploy with Docker Swarm
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: IMAGE_TAG,ECR_REGISTRY,ECR_REPOSITORY,ECR_REPOSITORY1,AWS_REGION
+          envs: IMAGE_TAG,ECR_REGISTRY,ECR_REPOSITORY,ECR_REPOSITORY1,AWS_REGION,COMPOSE_B64
           script: |
             set -e
-
             echo "Deploying IMAGE_TAG=$IMAGE_TAG"
 
-            # EC2 IAM role handles ECR auth directly
+            # Write compose file directly from base64 — no SCP needed
+            mkdir -p /home/ubuntu/app
+            echo "$COMPOSE_B64" | base64 -d > /home/ubuntu/app/docker-compose.yml
+
+            # ECR login using EC2 IAM role
             aws ecr get-login-password --region $AWS_REGION | docker login \
               --username AWS \
               --password-stdin $ECR_REGISTRY
 
-            # Pull exact images built in CI
+            # Pull exact images
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$IMAGE_TAG
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$IMAGE_TAG
 
@@ -82,8 +73,6 @@ jobs:
             docker swarm init 2>/dev/null || true
 
             cd /home/ubuntu/app
-
-            # Export so docker-compose variable substitution works
             export IMAGE_TAG=$IMAGE_TAG
 
             docker stack deploy \
@@ -91,5 +80,4 @@ jobs:
               --with-registry-auth \
               myapp
 
-            # Verify services are running
             docker stack services myapp
