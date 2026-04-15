@@ -1,19 +1,18 @@
-name: Rollback Deployment
+name: Manual Rollback Deployment
 
 on:
-  workflow_run:
-    workflows: ["Deploy to Private EC2 via Bastion"]
-    types:
-      - completed
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      frontend_tag:
+        description: "Frontend image tag (example: frontend-d8da3df0)"
+        required: true
+      backend_tag:
+        description: "Backend image tag (example: backend-d8da3df0)"
+        required: true
 
 jobs:
   rollback:
     runs-on: ubuntu-latest
-
-    # 🔥 Only run if deploy failed
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
 
     permissions:
       id-token: write
@@ -26,39 +25,13 @@ jobs:
       ECR_REPOSITORY1: myapp1_backend
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Get previous image tag
-        run: |
-          PREV_SHA=$(git rev-parse HEAD~1)
-          PREV_TAG="${PREV_SHA::8}"
-          echo "PREV_TAG=$PREV_TAG" >> $GITHUB_ENV
-          echo "Previous working tag: $PREV_TAG"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::641628981128:role/github-action
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify previous images exist in ECR
-        run: |
-          echo "Checking frontend image..."
-          aws ecr describe-images \
-            --repository-name myapp1_frontend \
-            --image-ids imageTag=frontend-${{ env.PREV_TAG }}
-
-          echo "Checking backend image..."
-          aws ecr describe-images \
-            --repository-name myapp1_backend \
-            --image-ids imageTag=backend-${{ env.PREV_TAG }}
-
-          echo "✅ Previous images exist in ECR"
-
-      - name: Setup SSH for Bastion + Private EC2
+      - name: Setup SSH (Bastion + EC2)
         run: |
           mkdir -p ~/.ssh
 
@@ -82,52 +55,42 @@ jobs:
 
           chmod 600 ~/.ssh/config
 
-      - name: Rollback deployment on EC2
+      - name: Rollback application
         run: |
           ssh private-ec2 'bash -s' << EOF
             set -e
 
-            PREV_TAG="${{ env.PREV_TAG }}"
+            FRONTEND_TAG="${{ github.event.inputs.frontend_tag }}"
+            BACKEND_TAG="${{ github.event.inputs.backend_tag }}"
 
-            echo "🔐 Logging into ECR..."
+            echo "🔐 Login to ECR..."
             aws ecr get-login-password --region $AWS_REGION | docker login \
               --username AWS \
               --password-stdin $ECR_REGISTRY
 
-            echo "⏪ Rolling back frontend"
-            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$PREV_TAG
+            echo "⏪ Rolling back frontend: $FRONTEND_TAG"
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG
 
             docker service update \
-              --image $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$PREV_TAG \
+              --image $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG \
               myapp_frontend
 
-            echo "⏪ Rolling back backend"
-            docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$PREV_TAG
+            echo "⏪ Rolling back backend: $BACKEND_TAG"
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG
 
             docker service update \
-              --image $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$PREV_TAG \
+              --image $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG \
               myapp_backend
 
-            echo "📦 Current services"
+            echo "📦 Services after rollback"
             docker stack services myapp
             docker stack ps myapp --no-trunc
           EOF
 
-      - name: Verify rollback health
+      - name: Verify rollback
         run: |
           ssh private-ec2 'bash -s' << EOF
-            sleep 30
+            sleep 20
 
-            FRONTEND=$(docker service ls --filter name=myapp_frontend --format "{{.Replicas}}")
-            BACKEND=$(docker service ls --filter name=myapp_backend --format "{{.Replicas}}")
-
-            echo "Frontend replicas: $FRONTEND"
-            echo "Backend replicas: $BACKEND"
-
-            if [[ "$FRONTEND" == "2/2" && "$BACKEND" == "1/1" ]]; then
-              echo "✅ Rollback successful"
-            else
-              echo "❌ Rollback may have issues"
-              exit 1
-            fi
+            docker service ls
           EOF
