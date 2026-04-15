@@ -1,22 +1,11 @@
-name: Manual Rollback Deployment
+name: Rollback Deployment (SSM Based)
 
 on:
   workflow_dispatch:
-    inputs:
-      frontend_tag:
-        description: "Frontend image tag (example: frontend-d8da3df0)"
-        required: true
-      backend_tag:
-        description: "Backend image tag (example: backend-d8da3df0)"
-        required: true
 
 jobs:
   rollback:
     runs-on: ubuntu-latest
-
-    permissions:
-      id-token: write
-      contents: read
 
     env:
       AWS_REGION: us-east-1
@@ -25,72 +14,63 @@ jobs:
       ECR_REPOSITORY1: myapp1_backend
 
     steps:
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::641628981128:role/github-action
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup SSH (Bastion + EC2)
+      - name: Get last good image from SSM
+        run: |
+          FRONTEND_TAG=$(aws ssm get-parameter \
+            --name "/myapp/frontend/last-good" \
+            --query "Parameter.Value" \
+            --output text)
+
+          BACKEND_TAG=$(aws ssm get-parameter \
+            --name "/myapp/backend/last-good" \
+            --query "Parameter.Value" \
+            --output text)
+
+          echo "FRONTEND_TAG=$FRONTEND_TAG" >> $GITHUB_ENV
+          echo "BACKEND_TAG=$BACKEND_TAG" >> $GITHUB_ENV
+
+          echo "Rolling back to:"
+          echo $FRONTEND_TAG
+          echo $BACKEND_TAG
+
+      - name: Setup SSH (Bastion → Private EC2)
         run: |
           mkdir -p ~/.ssh
 
-          echo "${{ secrets.BASTION_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.BASTION_KEY }}" > ~/.ssh/key
+          chmod 600 ~/.ssh/key
 
           cat >> ~/.ssh/config <<EOF
           Host bastion
               HostName ${{ secrets.BASTION_HOST }}
               User ${{ secrets.BASTION_USER }}
-              IdentityFile ~/.ssh/deploy_key
+              IdentityFile ~/.ssh/key
               StrictHostKeyChecking no
 
           Host private-ec2
               HostName ${{ secrets.PRIVATE_EC2_HOST }}
               User ${{ secrets.PRIVATE_EC2_USER }}
-              IdentityFile ~/.ssh/deploy_key
+              IdentityFile ~/.ssh/key
               ProxyJump bastion
               StrictHostKeyChecking no
           EOF
 
-          chmod 600 ~/.ssh/config
-
-      - name: Rollback application
+      - name: Execute rollback on EC2
         run: |
-          ssh private-ec2 'bash -s' << EOF
-            set -e
-
-            FRONTEND_TAG="${{ github.event.inputs.frontend_tag }}"
-            BACKEND_TAG="${{ github.event.inputs.backend_tag }}"
-
-            echo "🔐 Login to ECR..."
-            aws ecr get-login-password --region $AWS_REGION | docker login \
-              --username AWS \
-              --password-stdin $ECR_REGISTRY
-
-            echo "⏪ Rolling back frontend: $FRONTEND_TAG"
-            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG
-
-            docker service update \
-              --image $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG \
-              myapp_frontend
-
-            echo "⏪ Rolling back backend: $BACKEND_TAG"
-            docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG
-
-            docker service update \
-              --image $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG \
-              myapp_backend
-
-            echo "📦 Services after rollback"
-            docker stack services myapp
-            docker stack ps myapp --no-trunc
-          EOF
-
-      - name: Verify rollback
-        run: |
-          ssh private-ec2 'bash -s' << EOF
-            sleep 20
-
-            docker service ls
-          EOF
+          ssh private-ec2 "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY && \
+          
+          docker service update \
+            --image $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG \
+            myapp_frontend && \
+          
+          docker service update \
+            --image $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG \
+            myapp_backend && \
+          
+          docker stack services myapp"
