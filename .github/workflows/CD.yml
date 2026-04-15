@@ -1,21 +1,27 @@
 name: Deploy to Private EC2 via Bastion
+
 on:
   workflow_run:
     workflows: ["Build and Push to ECR"]
     types: [completed]
     branches: [main]
+
 jobs:
+
   deploy:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
     permissions:
       id-token: write
       contents: read
+
     env:
       AWS_REGION: us-east-1
       ECR_REGISTRY: 641628981128.dkr.ecr.us-east-1.amazonaws.com
       ECR_REPOSITORY: myapp1_frontend
       ECR_REPOSITORY1: myapp1_backend
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -86,3 +92,14 @@ jobs:
           ECR_REPOSITORY1: ${{ env.ECR_REPOSITORY1 }}
           AWS_REGION: ${{ env.AWS_REGION }}
           COMPOSE_B64: ${{ env.COMPOSE_B64 }}
+
+  # 👇 NEW JOB (Manual Approval)
+  approval:
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production   # 👈 THIS TRIGGERS APPROVAL
+
+    steps:
+      - name: Waiting for manual approval
+        run: echo "Waiting for approval..."
