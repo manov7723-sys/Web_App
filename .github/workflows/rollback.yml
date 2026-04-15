@@ -1,7 +1,7 @@
 name: Rollback Deployment
 
 on:
-  workflow_run:
+  workflow_dispatch:
     workflows: ["Deploy to Private EC2 via Bastion"]   # ← your cd.yml name
     types: [completed]
     branches: [main]
