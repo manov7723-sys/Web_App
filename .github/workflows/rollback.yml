@@ -3,6 +3,10 @@ name: Rollback Deployment (SSM Based)
 on:
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   rollback:
     runs-on: ubuntu-latest
@@ -14,12 +18,18 @@ jobs:
       ECR_REPOSITORY1: myapp1_backend
 
     steps:
+      # -------------------------
+      # 1. AWS OIDC LOGIN
+      # -------------------------
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::641628981128:role/github-action
           aws-region: ${{ env.AWS_REGION }}
 
+      # -------------------------
+      # 2. GET LAST GOOD TAGS FROM SSM
+      # -------------------------
       - name: Get last good image from SSM
         run: |
           FRONTEND_TAG=$(aws ssm get-parameter \
@@ -36,9 +46,12 @@ jobs:
           echo "BACKEND_TAG=$BACKEND_TAG" >> $GITHUB_ENV
 
           echo "Rolling back to:"
-          echo $FRONTEND_TAG
-          echo $BACKEND_TAG
+          echo "Frontend: $FRONTEND_TAG"
+          echo "Backend: $BACKEND_TAG"
 
+      # -------------------------
+      # 3. SETUP SSH (BASTION → PRIVATE EC2)
+      # -------------------------
       - name: Setup SSH (Bastion → Private EC2)
         run: |
           mkdir -p ~/.ssh
@@ -61,16 +74,29 @@ jobs:
               StrictHostKeyChecking no
           EOF
 
+      # -------------------------
+      # 4. ROLLBACK ON EC2
+      # -------------------------
       - name: Execute rollback on EC2
         run: |
-          ssh private-ec2 "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY && \
-          
-          docker service update \
-            --image $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG \
-            myapp_frontend && \
-          
-          docker service update \
-            --image $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG \
-            myapp_backend && \
-          
-          docker stack services myapp"
+          ssh private-ec2 "
+            set -e
+
+            export AWS_REGION=us-east-1
+
+            aws ecr get-login-password --region \$AWS_REGION | \
+              docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            echo 'Rolling back frontend...'
+            docker service update \
+              --image $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG \
+              myapp_frontend
+
+            echo 'Rolling back backend...'
+            docker service update \
+              --image $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG \
+              myapp_backend
+
+            echo 'Current services:'
+            docker service ls
+          "
