@@ -1,18 +1,24 @@
 name: Rollback Deployment
 
 on:
-  workflow_dispatch:
-    workflows: ["Deploy to Private EC2 via Bastion"]   # ← your cd.yml name
-    types: [completed]
-    branches: [main]
+  workflow_run:
+    workflows: ["Deploy to Private EC2 via Bastion"]
+    types:
+      - completed
+    branches:
+      - main
 
 jobs:
   rollback:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}  # ← only runs if cd.yml fails
+
+    # 🔥 Only run if deploy failed
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+
     permissions:
       id-token: write
       contents: read
+
     env:
       AWS_REGION: us-east-1
       ECR_REGISTRY: 641628981128.dkr.ecr.us-east-1.amazonaws.com
@@ -23,11 +29,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2                  # ← fetch last 2 commits
+          fetch-depth: 2
 
       - name: Get previous image tag
         run: |
-          # get the previous commit SHA (before the failed one)
           PREV_SHA=$(git rev-parse HEAD~1)
           PREV_TAG="${PREV_SHA::8}"
           echo "PREV_TAG=$PREV_TAG" >> $GITHUB_ENV
@@ -39,33 +44,34 @@ jobs:
           role-to-assume: arn:aws:iam::641628981128:role/github-action
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify previous image exists in ECR
+      - name: Verify previous images exist in ECR
         run: |
           echo "Checking frontend image..."
           aws ecr describe-images \
             --repository-name myapp1_frontend \
-            --image-ids imageTag=frontend-${{ env.PREV_TAG }} \
-            || { echo "❌ Previous frontend image not found in ECR!"; exit 1; }
+            --image-ids imageTag=frontend-${{ env.PREV_TAG }}
 
           echo "Checking backend image..."
           aws ecr describe-images \
             --repository-name myapp1_backend \
-            --image-ids imageTag=backend-${{ env.PREV_TAG }} \
-            || { echo "❌ Previous backend image not found in ECR!"; exit 1; }
+            --image-ids imageTag=backend-${{ env.PREV_TAG }}
 
-          echo "✅ Both images found for tag: ${{ env.PREV_TAG }}"
+          echo "✅ Previous images exist in ECR"
 
-      - name: Setup SSH key for Bastion + Private EC2
+      - name: Setup SSH for Bastion + Private EC2
         run: |
           mkdir -p ~/.ssh
+
           echo "${{ secrets.BASTION_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+
           cat >> ~/.ssh/config <<EOF
           Host bastion
               HostName ${{ secrets.BASTION_HOST }}
               User ${{ secrets.BASTION_USER }}
               IdentityFile ~/.ssh/deploy_key
               StrictHostKeyChecking no
+
           Host private-ec2
               HostName ${{ secrets.PRIVATE_EC2_HOST }}
               User ${{ secrets.PRIVATE_EC2_USER }}
@@ -73,36 +79,36 @@ jobs:
               ProxyJump bastion
               StrictHostKeyChecking no
           EOF
+
           chmod 600 ~/.ssh/config
 
-      - name: Rollback to previous image
+      - name: Rollback deployment on EC2
         run: |
           ssh private-ec2 'bash -s' << EOF
             set -e
 
             PREV_TAG="${{ env.PREV_TAG }}"
 
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login \
+            echo "🔐 Logging into ECR..."
+            aws ecr get-login-password --region $AWS_REGION | docker login \
               --username AWS \
-              --password-stdin ${{ env.ECR_REGISTRY }}
+              --password-stdin $ECR_REGISTRY
 
-            echo "⏪ Rolling back frontend to frontend-$PREV_TAG"
-            docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:frontend-$PREV_TAG
+            echo "⏪ Rolling back frontend"
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$PREV_TAG
+
             docker service update \
-              --image ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:frontend-$PREV_TAG \
-              --update-parallelism 1 \
-              --update-delay 10s \
+              --image $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$PREV_TAG \
               myapp_frontend
 
-            echo "⏪ Rolling back backend to backend-$PREV_TAG"
-            docker pull ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY1 }}:backend-$PREV_TAG
+            echo "⏪ Rolling back backend"
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$PREV_TAG
+
             docker service update \
-              --image ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY1 }}:backend-$PREV_TAG \
-              --update-parallelism 1 \
-              --update-delay 10s \
+              --image $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$PREV_TAG \
               myapp_backend
 
-            echo "=== ✅ Rollback complete ==="
+            echo "📦 Current services"
             docker stack services myapp
             docker stack ps myapp --no-trunc
           EOF
@@ -111,15 +117,17 @@ jobs:
         run: |
           ssh private-ec2 'bash -s' << EOF
             sleep 30
+
             FRONTEND=$(docker service ls --filter name=myapp_frontend --format "{{.Replicas}}")
             BACKEND=$(docker service ls --filter name=myapp_backend --format "{{.Replicas}}")
+
             echo "Frontend replicas: $FRONTEND"
             echo "Backend replicas: $BACKEND"
 
             if [[ "$FRONTEND" == "2/2" && "$BACKEND" == "1/1" ]]; then
-              echo "✅ Rollback successful - all replicas healthy"
+              echo "✅ Rollback successful"
             else
-              echo "❌ Rollback may have issues - check manually"
+              echo "❌ Rollback may have issues"
               exit 1
             fi
           EOF
