@@ -1,4 +1,4 @@
-name: Rollback Deployment (SSM Based)
+name: Manual Rollback Deployment (SSM Based)
 
 on:
   workflow_dispatch:
@@ -19,19 +19,21 @@ jobs:
 
     steps:
       # -------------------------
-      # 1. AWS OIDC LOGIN
+      # AWS OIDC LOGIN
       # -------------------------
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::641628981128:role/github-action
           aws-region: ${{ env.AWS_REGION }}
 
       # -------------------------
-      # 2. GET LAST GOOD TAGS FROM SSM
+      # GET LAST GOOD TAGS FROM SSM
       # -------------------------
-      - name: Get last good image from SSM
+      - name: Get rollback images from SSM
         run: |
+          set -e
+
           FRONTEND_TAG=$(aws ssm get-parameter \
             --name "/myapp/frontend/last-good" \
             --query "Parameter.Value" \
@@ -42,17 +44,16 @@ jobs:
             --query "Parameter.Value" \
             --output text)
 
+          echo "Frontend rollback -> $FRONTEND_TAG"
+          echo "Backend rollback -> $BACKEND_TAG"
+
           echo "FRONTEND_TAG=$FRONTEND_TAG" >> $GITHUB_ENV
           echo "BACKEND_TAG=$BACKEND_TAG" >> $GITHUB_ENV
 
-          echo "Rolling back to:"
-          echo "Frontend: $FRONTEND_TAG"
-          echo "Backend: $BACKEND_TAG"
-
       # -------------------------
-      # 3. SETUP SSH (BASTION → PRIVATE EC2)
+      # SSH SETUP (BASTION → EC2)
       # -------------------------
-      - name: Setup SSH (Bastion → Private EC2)
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
 
@@ -75,16 +76,14 @@ jobs:
           EOF
 
       # -------------------------
-      # 4. ROLLBACK ON EC2
+      # MANUAL ROLLBACK EXECUTION
       # -------------------------
       - name: Execute rollback on EC2
         run: |
           ssh private-ec2 "
             set -e
 
-            export AWS_REGION=us-east-1
-
-            aws ecr get-login-password --region \$AWS_REGION | \
+            aws ecr get-login-password --region $AWS_REGION | \
               docker login --username AWS --password-stdin $ECR_REGISTRY
 
             echo 'Rolling back frontend...'
@@ -97,6 +96,6 @@ jobs:
               --image $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG \
               myapp_backend
 
-            echo 'Current services:'
+            echo 'Rollback completed'
             docker service ls
           "
