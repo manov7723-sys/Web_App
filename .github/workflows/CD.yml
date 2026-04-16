@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
+    environment:
+      name: production   # 👈 THIS is the approval gate
+
     permissions:
       id-token: write
       contents: read
@@ -31,7 +34,6 @@ jobs:
           FULL_SHA="${{ github.event.workflow_run.head_sha }}"
           IMAGE_TAG="${FULL_SHA::8}"
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-          echo "Using IMAGE_TAG=$IMAGE_TAG"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -57,49 +59,35 @@ jobs:
               ProxyJump bastion
               StrictHostKeyChecking no
           EOF
-          chmod 600 ~/.ssh/config
 
       - name: Encode docker-compose as base64
         run: |
           COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
           echo "COMPOSE_B64=$COMPOSE_B64" >> $GITHUB_ENV
 
-      - name: Deploy with Docker Swarm via Bastion
+      - name: Deploy to EC2 via Bastion
         run: |
           ssh private-ec2 'bash -s' << EOF
             set -e
             echo "Deploying IMAGE_TAG=$IMAGE_TAG"
+
             mkdir -p /home/ubuntu/app
             echo "$COMPOSE_B64" | base64 -d > /home/ubuntu/app/docker-compose.yml
+
             aws ecr get-login-password --region $AWS_REGION | docker login \
               --username AWS \
               --password-stdin $ECR_REGISTRY
+
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:frontend-$IMAGE_TAG
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY1:backend-$IMAGE_TAG
+
             docker swarm init 2>/dev/null || true
+
             cd /home/ubuntu/app
             export IMAGE_TAG=$IMAGE_TAG
+
             docker stack deploy \
               --compose-file docker-compose.yml \
               --with-registry-auth \
               myapp
-            docker stack services myapp
           EOF
-        env:
-          IMAGE_TAG: ${{ env.IMAGE_TAG }}
-          ECR_REGISTRY: ${{ env.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
-          ECR_REPOSITORY1: ${{ env.ECR_REPOSITORY1 }}
-          AWS_REGION: ${{ env.AWS_REGION }}
-          COMPOSE_B64: ${{ env.COMPOSE_B64 }}
-
-  # 👇 NEW JOB (Manual Approval)
-  approval:
-    needs: deploy
-    runs-on: ubuntu-latest
-    environment:
-      name: production   # 👈 THIS TRIGGERS APPROVAL
-
-    steps:
-      - name: Waiting for manual approval
-        run: echo "Waiting for approval..."
