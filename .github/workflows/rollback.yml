@@ -28,7 +28,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       # -------------------------
-      # GET LAST GOOD TAGS FROM SSM
+      # GET LAST GOOD TAGS FROM SSM (SAFE VERSION)
       # -------------------------
       - name: Get rollback images from SSM
         run: |
@@ -37,15 +37,22 @@ jobs:
           FRONTEND_TAG=$(aws ssm get-parameter \
             --name "/myapp/frontend/last-good" \
             --query "Parameter.Value" \
-            --output text)
+            --output text 2>/dev/null || true)
 
           BACKEND_TAG=$(aws ssm get-parameter \
             --name "/myapp/backend/last-good" \
             --query "Parameter.Value" \
-            --output text)
+            --output text 2>/dev/null || true)
 
           echo "Frontend rollback -> $FRONTEND_TAG"
           echo "Backend rollback -> $BACKEND_TAG"
+
+          # ---------------- SAFETY CHECK ----------------
+          if [ -z "$FRONTEND_TAG" ] || [ -z "$BACKEND_TAG" ]; then
+            echo "❌ ERROR: Missing rollback versions in SSM"
+            echo "Rollback aborted safely"
+            exit 1
+          fi
 
           echo "FRONTEND_TAG=$FRONTEND_TAG" >> $GITHUB_ENV
           echo "BACKEND_TAG=$BACKEND_TAG" >> $GITHUB_ENV
@@ -55,6 +62,7 @@ jobs:
       # -------------------------
       - name: Setup SSH
         run: |
+          set -e
           mkdir -p ~/.ssh
 
           echo "${{ secrets.BASTION_KEY }}" > ~/.ssh/key
@@ -76,26 +84,33 @@ jobs:
           EOF
 
       # -------------------------
-      # MANUAL ROLLBACK EXECUTION
+      # EXECUTE ROLLBACK
       # -------------------------
       - name: Execute rollback on EC2
         run: |
+          set -e
+
           ssh private-ec2 "
             set -e
 
+            echo 'Logging into ECR...'
             aws ecr get-login-password --region $AWS_REGION | \
               docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            echo 'Rolling back frontend...'
+            echo 'Rolling back frontend → $FRONTEND_TAG'
             docker service update \
               --image $ECR_REGISTRY/$ECR_REPOSITORY:$FRONTEND_TAG \
               myapp_frontend
 
-            echo 'Rolling back backend...'
+            echo 'Rolling back backend → $BACKEND_TAG'
             docker service update \
               --image $ECR_REGISTRY/$ECR_REPOSITORY1:$BACKEND_TAG \
               myapp_backend
 
-            echo 'Rollback completed'
+            echo 'Verifying services...'
             docker service ls
+            docker service ps myapp_frontend
+            docker service ps myapp_backend
+
+            echo 'Rollback completed successfully'
           "
