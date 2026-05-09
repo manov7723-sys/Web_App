@@ -17,29 +17,23 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write   # REQUIRED for OIDC
-
-    outputs:
-      image_tag: ${{ steps.set_tag.outputs.image_tag }}
+      id-token: write
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       # -------------------------
-      # Set image tag (commit SHA)
+      # Set Image Tag
       # -------------------------
       - name: Set Image Tag
-        id: set_tag
         run: |
-          TAG=${GITHUB_SHA::8}
-          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
-          echo "image_tag=$TAG" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
 
       # -------------------------
-      # Authenticate using OIDC (NO JSON KEY)
+      # OIDC Authentication
       # -------------------------
-      - name: Authenticate to GCP
+      - name: Authenticate to GCP (OIDC)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_PROVIDER }}
@@ -49,38 +43,39 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       # -------------------------
-      # Configure Docker auth
+      # 🔥 CRITICAL FIX (force docker auth)
       # -------------------------
-      - name: Docker Auth
+      - name: Configure Docker Authentication
         run: |
-          gcloud auth configure-docker $GCP_REGION-docker.pkg.dev --quiet
+          gcloud auth configure-docker us-west1-docker.pkg.dev --quiet
+          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-west1-docker.pkg.dev
+
+      # -------------------------
+      # VERIFY AUTH (debug step)
+      # -------------------------
+      - name: Verify Auth
+        run: |
+          gcloud auth list
+          docker info
 
       # =========================
       # FRONTEND BUILD & PUSH
       # =========================
       - name: Build Frontend Image
         run: |
-          docker build \
-            -t $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$FRONTEND_REPO/$FRONTEND_IMAGE:frontend-$IMAGE_TAG \
-            -t $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$FRONTEND_REPO/$FRONTEND_IMAGE:frontend-latest \
-            ./frontend
+          docker build -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${FRONTEND_REPO}/${FRONTEND_IMAGE}:frontend-$IMAGE_TAG ./frontend
 
       - name: Push Frontend Image
         run: |
-          docker push $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$FRONTEND_REPO/$FRONTEND_IMAGE:frontend-$IMAGE_TAG
-          docker push $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$FRONTEND_REPO/$FRONTEND_IMAGE:frontend-latest
+          docker push us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${FRONTEND_REPO}/${FRONTEND_IMAGE}:frontend-$IMAGE_TAG
 
       # =========================
       # BACKEND BUILD & PUSH
       # =========================
       - name: Build Backend Image
         run: |
-          docker build \
-            -t $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$BACKEND_REPO/$BACKEND_IMAGE:backend-$IMAGE_TAG \
-            -t $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$BACKEND_REPO/$BACKEND_IMAGE:backend-latest \
-            ./backend
+          docker build -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${BACKEND_REPO}/${BACKEND_IMAGE}:backend-$IMAGE_TAG ./backend
 
       - name: Push Backend Image
         run: |
-          docker push $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$BACKEND_REPO/$BACKEND_IMAGE:backend-$IMAGE_TAG
-          docker push $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$BACKEND_REPO/$BACKEND_IMAGE:backend-latest
+          docker push us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${BACKEND_REPO}/${BACKEND_IMAGE}:backend-$IMAGE_TAG
