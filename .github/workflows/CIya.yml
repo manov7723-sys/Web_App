@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      GCP_REGION: us-west1
+      REGION: us-west1
       FRONTEND_REPO: frontend-repo
       BACKEND_REPO: backend-repo
       FRONTEND_IMAGE: myapp1_frontend
@@ -20,40 +20,45 @@ jobs:
       id-token: write
 
     steps:
+
+      # =========================
+      # Checkout Code
+      # =========================
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # -------------------------
+      # =========================
       # Set Image Tag
-      # -------------------------
+      # =========================
       - name: Set Image Tag
-        run: |
-          echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
+        run: echo "IMAGE_TAG=${GITHUB_SHA::8}" >> $GITHUB_ENV
 
-      # -------------------------
-      # OIDC Authentication
-      # -------------------------
-      - name: Authenticate to GCP (OIDC)
+      # =========================
+      # OIDC AUTH (IMPORTANT)
+      # =========================
+      - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
+      # =========================
+      # Setup gcloud
+      # =========================
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      # -------------------------
-      # 🔥 CRITICAL FIX (force docker auth)
-      # -------------------------
-      - name: Configure Docker Authentication
+      # =========================
+      # Docker Authentication (FIXED)
+      # =========================
+      - name: Configure Docker
         run: |
           gcloud auth configure-docker us-west1-docker.pkg.dev --quiet
-          gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://us-west1-docker.pkg.dev
 
-      # -------------------------
-      # VERIFY AUTH (debug step)
-      # -------------------------
-      - name: Verify Auth
+      # =========================
+      # VERIFY AUTH (DEBUG)
+      # =========================
+      - name: Verify Authentication
         run: |
           gcloud auth list
           docker info
@@ -61,21 +66,25 @@ jobs:
       # =========================
       # FRONTEND BUILD & PUSH
       # =========================
-      - name: Build Frontend Image
+      - name: Build & Push Frontend
         run: |
-          docker build -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${FRONTEND_REPO}/${FRONTEND_IMAGE}:frontend-$IMAGE_TAG ./frontend
+          docker build \
+            -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${FRONTEND_REPO}/${FRONTEND_IMAGE}:frontend-$IMAGE_TAG \
+            -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${FRONTEND_REPO}/${FRONTEND_IMAGE}:frontend-latest \
+            ./frontend
 
-      - name: Push Frontend Image
-        run: |
           docker push us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${FRONTEND_REPO}/${FRONTEND_IMAGE}:frontend-$IMAGE_TAG
+          docker push us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${FRONTEND_REPO}/${FRONTEND_IMAGE}:frontend-latest
 
       # =========================
       # BACKEND BUILD & PUSH
       # =========================
-      - name: Build Backend Image
+      - name: Build & Push Backend
         run: |
-          docker build -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${BACKEND_REPO}/${BACKEND_IMAGE}:backend-$IMAGE_TAG ./backend
+          docker build \
+            -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${BACKEND_REPO}/${BACKEND_IMAGE}:backend-$IMAGE_TAG \
+            -t us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${BACKEND_REPO}/${BACKEND_IMAGE}:backend-latest \
+            ./backend
 
-      - name: Push Backend Image
-        run: |
           docker push us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${BACKEND_REPO}/${BACKEND_IMAGE}:backend-$IMAGE_TAG
+          docker push us-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${BACKEND_REPO}/${BACKEND_IMAGE}:backend-latest
