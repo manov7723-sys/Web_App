@@ -1,68 +1,89 @@
 version: "3.8"
 
 services:
+
   frontend:
-    image: 641628981128.dkr.ecr.us-east-1.amazonaws.com/myapp1_frontend:frontend-${IMAGE_TAG}
+    image: us-west1-docker.pkg.dev/new-project-495604/frontend-repo/myapp1_frontend:frontend-${IMAGE_TAG}
+
     ports:
       - "80:80"
+
     networks:
       - app-network
+
     depends_on:
       - backend
+
     deploy:
       replicas: 2
+
       update_config:
         parallelism: 1
         delay: 10s
         monitor: 30s
         failure_action: rollback
+
       rollback_config:
         parallelism: 1
         delay: 5s
         monitor: 30s
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]   # frontend check
+      test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 10s
       timeout: 5s
       retries: 3
 
   backend:
-    image: 641628981128.dkr.ecr.us-east-1.amazonaws.com/myapp1_backend:backend-${IMAGE_TAG}
+    image: us-west1-docker.pkg.dev/new-project-495604/backend-repo/myapp1_backend:backend-${IMAGE_TAG}
+
     ports:
       - "8080:8080"
+
     environment:
       - MONGO_URI=mongodb://mongo:27017/mydatabase
+
     networks:
       - app-network
+
     depends_on:
       - mongo
+
     deploy:
       replicas: 2
+
       update_config:
         parallelism: 1
         delay: 10s
         monitor: 30s
         failure_action: rollback
+
       rollback_config:
         parallelism: 1
         delay: 5s
         monitor: 30s
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]  # backend health endpoint
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3
 
   mongo:
     image: mongo:6.0
+
     volumes:
       - mongo-data:/data/db
+
     networks:
       - app-network
+
     deploy:
       replicas: 1
+
       restart_policy:
         condition: any
+
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
