@@ -1,0 +1,129 @@
+name: Deploy to GCP VM using Docker Swarm
+
+on:
+  workflow_run:
+    workflows: ["Build and Push to Artifact Registry"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+
+  deploy:
+    runs-on: ubuntu-latest
+
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    environment:
+      name: production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      GCP_REGION: us-west1
+
+      FRONTEND_REPO: frontend-repo
+      BACKEND_REPO: backend-repo
+
+      FRONTEND_IMAGE: myapp1_frontend
+      BACKEND_IMAGE: myapp1_backend
+
+    steps:
+
+      # =========================
+      # Checkout Code
+      # =========================
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # =========================
+      # Set IMAGE_TAG
+      # =========================
+      - name: Set IMAGE_TAG
+        run: |
+          FULL_SHA="${{ github.event.workflow_run.head_sha }}"
+          IMAGE_TAG="${FULL_SHA::8}"
+
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      # =========================
+      # Setup SSH Key
+      # =========================
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.VM_SSH_KEY }}" > ~/.ssh/deploy_key
+
+          chmod 600 ~/.ssh/deploy_key
+
+          cat >> ~/.ssh/config <<EOF
+          Host gcp-vm
+              HostName ${{ secrets.VM_HOST }}
+              User ${{ secrets.VM_USER }}
+              IdentityFile ~/.ssh/deploy_key
+              StrictHostKeyChecking no
+          EOF
+
+      # =========================
+      # Encode Docker Compose
+      # =========================
+      - name: Encode docker-compose
+        run: |
+          COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
+
+          echo "COMPOSE_B64=$COMPOSE_B64" >> $GITHUB_ENV
+
+      # =========================
+      # Deploy to GCP VM
+      # =========================
+      - name: Deploy Application
+        run: |
+
+          ssh gcp-vm 'bash -s' << EOF
+
+            set -e
+
+            echo "Starting Deployment..."
+
+            mkdir -p /home/${{ secrets.VM_USER }}/app
+
+            echo "$COMPOSE_B64" | base64 -d > /home/${{ secrets.VM_USER }}/app/docker-compose.yml
+
+            # -------------------------
+            # Configure Docker Auth
+            # -------------------------
+            gcloud auth configure-docker $GCP_REGION-docker.pkg.dev --quiet
+
+            # -------------------------
+            # Pull Frontend Image
+            # -------------------------
+            docker pull \
+            $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$FRONTEND_REPO/$FRONTEND_IMAGE:frontend-$IMAGE_TAG
+
+            # -------------------------
+            # Pull Backend Image
+            # -------------------------
+            docker pull \
+            $GCP_REGION-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/$BACKEND_REPO/$BACKEND_IMAGE:backend-$IMAGE_TAG
+
+            # -------------------------
+            # Initialize Swarm
+            # -------------------------
+            docker swarm init 2>/dev/null || true
+
+            cd /home/${{ secrets.VM_USER }}/app
+
+            export IMAGE_TAG=$IMAGE_TAG
+
+            # -------------------------
+            # Deploy Stack
+            # -------------------------
+            docker stack deploy \
+              --compose-file docker-compose.yml \
+              myapp
+
+            echo "Deployment Successful"
+
+          EOF
